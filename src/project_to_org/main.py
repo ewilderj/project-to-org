@@ -36,6 +36,9 @@ def main():
         # Determine priority map: CLI > File > None (Auto-detect)
         priority_map_to_use = args.priority_map or existing_config.get('priority_map')
         
+        # Status colors are always auto-detected from GitHub, but can be persisted
+        status_colors_to_use = existing_config.get('status_colors')
+        
         # Determine exclude statuses: CLI (if not default empty) > File > CLI Default
         # Note: args.exclude_statuses is a list, default []
         # If user passed --exclude-statuses, it will be non-empty (or empty list if they passed nothing, but default is [])
@@ -57,7 +60,8 @@ def main():
             project_url=args.project_url, 
             exclude_statuses=exclude_statuses_to_use,
             status_map_str=status_map_to_use,
-            priority_map_str=priority_map_to_use
+            priority_map_str=priority_map_to_use,
+            status_colors_str=status_colors_to_use
         )
         org_content = converter.convert()
         

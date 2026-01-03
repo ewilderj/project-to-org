@@ -17,10 +17,12 @@ def extract_config_from_org(file_path):
                 config['exclude_statuses'] = line.split(":", 1)[1].strip().split()
             elif line.startswith("#+GITHUB_PRIORITY_MAP:"):
                 config['priority_map'] = line.split(":", 1)[1].strip()
+            elif line.startswith("#+GITHUB_STATUS_COLORS:"):
+                config['status_colors'] = line.split(":", 1)[1].strip()
     return config
 
 class OrgConverter:
-    def __init__(self, project_data, project_url=None, exclude_statuses=None, status_map_str=None, priority_map_str=None):
+    def __init__(self, project_data, project_url=None, exclude_statuses=None, status_map_str=None, priority_map_str=None, status_colors_str=None):
         self.project_data = project_data
         self.project_url = project_url
         self.exclude_statuses = exclude_statuses or []
@@ -42,6 +44,14 @@ class OrgConverter:
         else:
             self.priority_map, self.priority_scheme = self._generate_default_priority_map()
             self.priority_map_str = self._generate_priority_map_str() if self.priority_map else None
+
+        # Status colors (GitHub status -> org keyword -> color)
+        if status_colors_str:
+            self.status_colors = self._parse_status_colors(status_colors_str)
+            self.status_colors_str = status_colors_str
+        else:
+            self.status_colors = self._extract_status_colors()
+            self.status_colors_str = self._generate_status_colors_str() if self.status_colors else None
 
     def _generate_default_status_map(self):
         """Generate a default status map based on project fields."""
@@ -268,6 +278,45 @@ class OrgConverter:
             
         return f"#+PRIORITIES: {max_pri} {min_pri} {default_pri}"
 
+    def _extract_status_colors(self):
+        """Extract status colors from project fields and map to org keywords."""
+        colors = {}
+        fields = self.project_data.get("fields", {}).get("nodes", [])
+        for field in fields:
+            if field.get("name") == "Status":
+                for opt in field.get("options", []):
+                    github_status = opt.get("name")
+                    github_color = opt.get("color")
+                    if github_status and github_color:
+                        # Map to org keyword
+                        org_keyword = self.status_map.get(github_status)
+                        if org_keyword:
+                            colors[org_keyword] = github_color
+                break
+        return colors
+
+    def _parse_status_colors(self, colors_str):
+        """Parse status colors string like 'TODO=YELLOW STRT=PURPLE'."""
+        colors = {}
+        try:
+            parts = shlex.split(colors_str)
+            for part in parts:
+                if '=' in part:
+                    key, value = part.rsplit('=', 1)
+                    colors[key] = value
+        except Exception:
+            pass
+        return colors
+
+    def _generate_status_colors_str(self):
+        """Generate status colors string for persistence."""
+        if not self.status_colors:
+            return None
+        parts = []
+        for keyword, color in self.status_colors.items():
+            parts.append(f'{keyword}={color}')
+        return " ".join(parts)
+
     def convert(self):
         """Convert project data to Org-mode string."""
         lines = []
@@ -287,6 +336,10 @@ class OrgConverter:
         # Persist the priority map if we have one
         if self.priority_map_str:
             lines.append(f"#+GITHUB_PRIORITY_MAP: {self.priority_map_str}")
+        
+        # Persist the status colors if we have them
+        if self.status_colors_str:
+            lines.append(f"#+GITHUB_STATUS_COLORS: {self.status_colors_str}")
         
         lines.append(f"#+DATE: {datetime.date.today()}")
         

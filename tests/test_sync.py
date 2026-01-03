@@ -519,3 +519,79 @@ def test_no_priority_field():
     
     assert "#+PRIORITIES:" not in output
     assert "#+GITHUB_PRIORITY_MAP:" not in output
+
+
+# ============================================================================
+# Status Colors Tests
+# ============================================================================
+
+def test_status_colors_extraction():
+    """Test that status colors are extracted from project fields."""
+    project_data = {
+        "items": {"nodes": []},
+        "fields": {
+            "nodes": [
+                {
+                    "name": "Status",
+                    "options": [
+                        {"name": "Todo", "color": "YELLOW"},
+                        {"name": "In Progress", "color": "PURPLE"},
+                        {"name": "Done", "color": "GREEN"}
+                    ]
+                }
+            ]
+        }
+    }
+    
+    converter = OrgConverter(project_data)
+    
+    assert converter.status_colors == {"TODO": "YELLOW", "STRT": "PURPLE", "DONE": "GREEN"}
+    
+    output = converter.convert()
+    assert "#+GITHUB_STATUS_COLORS:" in output
+    assert "TODO=YELLOW" in output
+    assert "STRT=PURPLE" in output
+    assert "DONE=GREEN" in output
+
+
+def test_status_colors_persistence():
+    """Test that status colors are read from file."""
+    from project_to_org.org_converter import extract_config_from_org
+    import tempfile
+    
+    org_content = """#+TITLE: Test
+#+GITHUB_STATUS_COLORS: TODO=YELLOW STRT=PURPLE DONE=GREEN
+"""
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.org', delete=False) as f:
+        f.write(org_content)
+        f.flush()
+        
+        config = extract_config_from_org(f.name)
+        assert config.get('status_colors') == "TODO=YELLOW STRT=PURPLE DONE=GREEN"
+        
+        import os
+        os.unlink(f.name)
+
+
+def test_no_status_colors_when_missing():
+    """Test that no color header is generated when colors not in project data."""
+    project_data = {
+        "items": {"nodes": []},
+        "fields": {
+            "nodes": [
+                {
+                    "name": "Status",
+                    "options": [
+                        {"name": "Todo"},  # No color field
+                        {"name": "Done"}
+                    ]
+                }
+            ]
+        }
+    }
+    
+    converter = OrgConverter(project_data)
+    output = converter.convert()
+    
+    assert "#+GITHUB_STATUS_COLORS:" not in output

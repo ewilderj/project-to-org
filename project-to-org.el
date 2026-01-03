@@ -214,6 +214,64 @@ Returns a plist with :issue-number, :assignees, :labels, and :url."
         (org-fold-hide-drawer-toggle t)
         (forward-line 1)))))
 
+(defconst project-to-org--github-color-map
+  '(("GRAY"   . (:foreground "#d8dadd" :background "#57606a"))
+    ("BLUE"   . (:foreground "#b6e3ff" :background "#0550ae"))
+    ("GREEN"  . (:foreground "#aceebb" :background "#1a7f37"))
+    ("YELLOW" . (:foreground "#f5e08a" :background "#7d5e08"))
+    ("ORANGE" . (:foreground "#ffd8b5" :background "#bc4c00"))
+    ("RED"    . (:foreground "#ffc1c0" :background "#cf222e"))
+    ("PINK"   . (:foreground "#f9c9e2" :background "#bf3989"))
+    ("PURPLE" . (:foreground "#e8d5f9" :background "#6639ba")))
+  "Map GitHub project colors to Emacs face specs.
+Each entry is (GITHUB-COLOR . (:foreground FG :background BG)).
+Colors are swapped because org-mode applies inverse-video to TODO keywords.")
+
+(defvar-local project-to-org--status-color-overlays nil
+  "List of overlays used for status color highlighting.")
+
+(defun project-to-org--parse-status-colors (colors-str)
+  "Parse COLORS-STR like \\='TODO=YELLOW STRT=PURPLE\\=' into an alist."
+  (when colors-str
+    (let ((pairs '()))
+      (dolist (part (split-string colors-str " " t))
+        (when (string-match "\\([^=]+\\)=\\([^=]+\\)" part)
+          (push (cons (match-string 1 part) (match-string 2 part)) pairs)))
+      (nreverse pairs))))
+
+(defun project-to-org--remove-status-color-overlays ()
+  "Remove all status color overlays from the buffer."
+  (mapc #'delete-overlay project-to-org--status-color-overlays)
+  (setq project-to-org--status-color-overlays nil))
+
+(defun project-to-org--apply-status-color-overlays (status-colors)
+  "Apply overlays for TODO keywords based on STATUS-COLORS alist."
+  (save-excursion
+    (goto-char (point-min))
+    (while (re-search-forward org-complex-heading-regexp nil t)
+      (when-let* ((todo-start (match-beginning 2))
+                  (todo-end (match-end 2))
+                  (todo-keyword (match-string 2))
+                  (github-color (cdr (assoc todo-keyword status-colors)))
+                  (color-spec (cdr (assoc github-color
+                                          project-to-org--github-color-map))))
+        (let ((ov (make-overlay todo-start todo-end nil t))
+              (fg (plist-get color-spec :foreground))
+              (bg (plist-get color-spec :background)))
+          ;; Use a complete face spec that overrides org-mode's TODO faces
+          (overlay-put ov 'face `(:foreground ,fg :background ,bg :weight bold
+                                  :inherit nil))
+          (overlay-put ov 'priority 1000)
+          (overlay-put ov 'project-to-org-status-color t)
+          (push ov project-to-org--status-color-overlays))))))
+
+(defun project-to-org--setup-status-colors ()
+  "Apply GitHub status colors to Org-mode TODO keywords using overlays."
+  (project-to-org--remove-status-color-overlays)
+  (when-let* ((colors-str (project-to-org--get-property "GITHUB_STATUS_COLORS"))
+              (status-colors (project-to-org--parse-status-colors colors-str)))
+    (project-to-org--apply-status-color-overlays status-colors)))
+
 (defun project-to-org--setup-compact-urls ()
   "Set up compact URL display for the current buffer."
   (when (and (derived-mode-p 'org-mode)
@@ -235,12 +293,16 @@ Returns a plist with :issue-number, :assignees, :labels, and :url."
   :group 'project-to-org
   (if project-to-org-mode
       (progn
+        (project-to-org--setup-status-colors)
         (project-to-org--setup-compact-urls)
         (project-to-org--setup-inline-metadata)
         (add-hook 'after-save-hook #'project-to-org--setup-compact-urls nil t)
-        (add-hook 'after-save-hook #'project-to-org--setup-inline-metadata nil t))
+        (add-hook 'after-save-hook #'project-to-org--setup-inline-metadata nil t)
+        (add-hook 'after-save-hook #'project-to-org--setup-status-colors nil t))
     (remove-hook 'after-save-hook #'project-to-org--setup-compact-urls t)
     (remove-hook 'after-save-hook #'project-to-org--setup-inline-metadata t)
+    (remove-hook 'after-save-hook #'project-to-org--setup-status-colors t)
+    (project-to-org--remove-status-color-overlays)
     (project-to-org--remove-all-metadata-badges)))
 
 (defun project-to-org--get-property (property)

@@ -29,11 +29,11 @@ This document captures potential enhancements for a `project-to-org-mode` minor 
 - Full properties available on demand
 
 ### 3. Status-aware Styling
-- Color-code TODO keywords to match your GitHub project colors
+- Color-code TODO keywords to match your GitHub project colors ✅
 - Strikethrough for DONE items
 - Dim excluded statuses
 - Add emoji prefixes automatically (🟦 TODO, 🟨 STRT, ✅ DONE)
-- Use `org-todo-keyword-faces` for color mapping
+- Use `org-todo-keyword-faces` for color mapping ✅
 
 ### 4. Smart Folding ⭐
 - Auto-fold properties drawers on file open

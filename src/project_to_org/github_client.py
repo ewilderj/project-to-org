@@ -63,6 +63,7 @@ def fetch_project_items(owner_type, owner, number, token):
                 name
                 options {{
                   name
+                  color
                 }}
               }}
             }}
