@@ -55,18 +55,18 @@ def test_status_map_persistence(persistent_project_info):
         
         # Verify original status map
         assert "#+GITHUB_STATUS_MAP:" in original_content
-        assert "Todo:TODO" in original_content or '"Todo":TODO' in original_content
+        assert "Todo=TODO" in original_content or '"Todo"=TODO' in original_content
         
         # Step 2: Modify the status map
         print("Step 2: Modifying status map...")
-        modified_content = original_content.replace("Todo:TODO", "Todo:MUSTDO")
+        modified_content = original_content.replace("Todo=TODO", "Todo=MUSTDO")
         with open(org_file, 'w') as f:
             f.write(modified_content)
         
         # Verify modification
         with open(org_file, 'r') as f:
             check_content = f.read()
-        assert "Todo:MUSTDO" in check_content
+        assert "Todo=MUSTDO" in check_content
         print(f"Modified content verified:\n{check_content}")
         
         # Step 3: Second sync
@@ -85,7 +85,7 @@ def test_status_map_persistence(persistent_project_info):
         print(f"Final content:\n{final_content}")
         
         # This should pass if persistence works
-        assert "Todo:MUSTDO" in final_content, "Custom status map was not preserved!"
+        assert "Todo=MUSTDO" in final_content, "Custom status map was not preserved!"
         
     finally:
         if os.path.exists(org_file):

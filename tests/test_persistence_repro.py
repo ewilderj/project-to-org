@@ -37,12 +37,12 @@ def test_persistence_repro():
         # Verify default map
         with open(org_file_path, 'r') as f:
             content = f.read()
-        assert "#+GITHUB_STATUS_MAP: Todo:TODO Done:DONE" in content
+        assert "#+GITHUB_STATUS_MAP: Todo=TODO Done=DONE" in content
         
         # 2. Modify the map in the file
         # We change TODO to MUSTDO
-        new_map_line = "#+GITHUB_STATUS_MAP: Todo:MUSTDO Done:DONE"
-        content = content.replace("#+GITHUB_STATUS_MAP: Todo:TODO Done:DONE", new_map_line)
+        new_map_line = "#+GITHUB_STATUS_MAP: Todo=MUSTDO Done=DONE"
+        content = content.replace("#+GITHUB_STATUS_MAP: Todo=TODO Done=DONE", new_map_line)
         with open(org_file_path, 'w') as f:
             f.write(content)
             
@@ -60,7 +60,7 @@ def test_persistence_repro():
             
         print(f"DEBUG: Content after second sync:\n{new_content}")
         
-        assert "#+GITHUB_STATUS_MAP: Todo:MUSTDO Done:DONE" in new_content
+        assert "#+GITHUB_STATUS_MAP: Todo=MUSTDO Done=DONE" in new_content
         
     finally:
         if os.path.exists(org_file_path):

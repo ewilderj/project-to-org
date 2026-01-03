@@ -108,8 +108,8 @@ class OrgConverter:
         try:
             parts = shlex.split(map_str)
             for part in parts:
-                if ':' in part:
-                    key, value = part.rsplit(':', 1)
+                if '=' in part:
+                    key, value = part.rsplit('=', 1)
                     mapping[key] = value
         except Exception:
             # Fallback or log error? For now, return empty or default?
@@ -121,9 +121,9 @@ class OrgConverter:
         parts = []
         for key, value in self.status_map.items():
             if " " in key:
-                parts.append(f'"{key}":{value}')
+                parts.append(f'"{key}"={value}')
             else:
-                parts.append(f'{key}:{value}')
+                parts.append(f'{key}={value}')
         return " ".join(parts)
 
     def convert(self):

@@ -99,4 +99,4 @@ def test_integration_sync(integration_project):
     
     # Verify heuristics worked (Todo -> TODO)
     # Note: New projects usually have "Todo", "In Progress", "Done"
-    assert "Todo:TODO" in org_output or '"Todo":TODO' in org_output
+    assert "Todo=TODO" in org_output or '"Todo"=TODO' in org_output

@@ -13,7 +13,7 @@ def main():
     parser.add_argument("--org-file", help="Path to the Org file to sync", required=False)
     parser.add_argument("--project-url", help="GitHub Project URL", required=True)
     parser.add_argument("--exclude-statuses", help="List of statuses to exclude", nargs="*", default=[])
-    parser.add_argument("--status-map", help="Status mapping string (e.g. 'Todo:TODO \"In Progress\":STRT')", required=False)
+    parser.add_argument("--status-map", help="Status mapping string (e.g. 'Todo=TODO \"In Progress\"=STRT')", required=False)
     
     args = parser.parse_args()
     

@@ -32,6 +32,84 @@ Defaults to 'uv run' which handles dependencies automatically."
   :type 'file
   :group 'project-to-org)
 
+(defcustom project-to-org-compact-urls t
+  "Whether to display GitHub URLs compactly (e.g., owner/repo#123)."
+  :type 'boolean
+  :group 'project-to-org)
+
+(defface project-to-org-compact-url
+  '((t :inherit org-link :underline t))
+  "Face for compact GitHub URL display."
+  :group 'project-to-org)
+
+(defun project-to-org--parse-github-url (url)
+  "Parse a GitHub URL and return (owner repo type number).
+TYPE is either 'issue or 'pull-request.
+Returns nil if URL is not a recognized GitHub issue/PR URL."
+  (when (string-match "https://github\\.com/\\([^/]+\\)/\\([^/]+\\)/\\(issues\\|pull\\)/\\([0-9]+\\)" url)
+    (list (match-string 1 url)
+          (match-string 2 url)
+          (if (string= (match-string 3 url) "issues") 'issue 'pull-request)
+          (match-string 4 url))))
+
+(defun project-to-org--compact-url-string (url)
+  "Convert a GitHub URL to compact format (owner/repo#123)."
+  (let ((parsed (project-to-org--parse-github-url url)))
+    (when parsed
+      (let ((owner (nth 0 parsed))
+            (repo (nth 1 parsed))
+            (number (nth 3 parsed)))
+        (format "%s/%s#%s" owner repo number)))))
+
+(defun project-to-org--buttonize-url (start end)
+  "Make the URL between START and END into a clickable compact button."
+  (let* ((url (buffer-substring-no-properties start end))
+         (compact (project-to-org--compact-url-string url)))
+    (when compact
+      (let ((map (make-sparse-keymap)))
+        (define-key map [mouse-1] 
+          (lambda () (interactive) (browse-url url)))
+        (define-key map (kbd "RET") 
+          (lambda () (interactive) (browse-url url)))
+        (define-key map [mouse-2] 
+          (lambda () (interactive) (kill-new url) (message "Copied: %s" url)))
+        (define-key map (kbd "C-c C-c") 
+          (lambda () (interactive) (kill-new url) (message "Copied: %s" url)))
+        
+        (with-silent-modifications
+          (put-text-property start end 'display compact)
+          (put-text-property start end 'face 'project-to-org-compact-url)
+          (put-text-property start end 'keymap map)
+          (put-text-property start end 'mouse-face 'highlight)
+          (put-text-property start end 'help-echo 
+                           (format "%s\nmouse-1: open in browser\nmouse-2: copy URL" url))
+          (put-text-property start end 'project-to-org-url t))))))
+
+(defun project-to-org--compact-urls-in-buffer ()
+  "Apply compact URL display to all GitHub URLs in the current buffer."
+  (when project-to-org-compact-urls
+    (save-excursion
+      (goto-char (point-min))
+      (while (re-search-forward ":URL: \\(https://github\\.com/[^ \n]+\\)" nil t)
+        (project-to-org--buttonize-url (match-beginning 1) (match-end 1))))))
+
+(defun project-to-org--setup-compact-urls ()
+  "Set up compact URL display for the current buffer."
+  (when (and (derived-mode-p 'org-mode)
+             (project-to-org--get-property "GITHUB_PROJECT_URL"))
+    (project-to-org--compact-urls-in-buffer)))
+
+;;;###autoload
+(define-minor-mode project-to-org-mode
+  "Minor mode for enhanced GitHub Project integration in Org-mode."
+  :lighter " GH"
+  :group 'project-to-org
+  (if project-to-org-mode
+      (progn
+        (project-to-org--setup-compact-urls)
+        (add-hook 'after-save-hook #'project-to-org--setup-compact-urls nil t))
+    (remove-hook 'after-save-hook #'project-to-org--setup-compact-urls t)))
+
 (defun project-to-org--get-property (property)
   "Get the value of a file-level PROPERTY from the current buffer."
   (save-excursion
@@ -77,6 +155,8 @@ Requires #+GITHUB_PROJECT_URL to be set in the file."
                  (progn
                    (with-current-buffer target-buffer
                      (revert-buffer t t t)
+                     (when project-to-org-mode
+                       (project-to-org--setup-compact-urls))
                      (message "Sync complete!")))
                (with-current-buffer error-buffer
                  (message "Sync failed: %s" (buffer-string))))

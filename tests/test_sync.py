@@ -177,7 +177,7 @@ def test_custom_status_map():
     }
     
     # Map "My Custom Status" to "CUSTOM"
-    map_str = '"My Custom Status":CUSTOM'
+    map_str = '"My Custom Status"=CUSTOM'
     converter = OrgConverter(mock_data, status_map_str=map_str)
     org_output = converter.convert()
     
@@ -189,7 +189,7 @@ def test_status_mapping_uniqueness():
     mock_data = {"title": "Test", "items": {"nodes": []}}
     
     # Duplicate mapping: Todo -> TODO, Backlog -> TODO
-    map_str = 'Todo:TODO Backlog:TODO'
+    map_str = 'Todo=TODO Backlog=TODO'
     
     with pytest.raises(ValueError, match="Status mapping must be 1:1"):
         OrgConverter(mock_data, status_map_str=map_str)
@@ -277,7 +277,7 @@ def test_todo_line_generation():
     
     assert "#+TODO: TODO STRT | DONE" in output
     # Check for space-separated map with quotes for keys with spaces
-    assert '#+GITHUB_STATUS_MAP: Todo:TODO "In Progress":STRT Done:DONE' in output
+    assert '#+GITHUB_STATUS_MAP: Todo=TODO "In Progress"=STRT Done=DONE' in output
 
 def test_todo_line_generation_custom_statuses():
     project_data = {

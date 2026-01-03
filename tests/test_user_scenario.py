@@ -19,7 +19,7 @@ def test_waiting_for_godot_persistence():
     before_content = """#+TITLE: ewilderj work
 #+GITHUB_PROJECT_URL: https://github.com/users/ewilderj/projects/1
 #+GITHUB_EXCLUDE_STATUSES: Done
-#+GITHUB_STATUS_MAP: Todo:TODO "In Progress":STRT "Waiting For":GODOT Someday:WAIT Done:DONE
+#+GITHUB_STATUS_MAP: Todo=TODO "In Progress"=STRT "Waiting For"=GODOT Someday=WAIT Done=DONE
 #+DATE: 2026-01-02
 #+TODO: TODO STRT GODOT WAIT | DONE
 #+STARTUP: show2levels
