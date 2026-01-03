@@ -2,6 +2,7 @@
 
 ## User Preferences
 - **Python Tooling**: Use `uv` for dependency management and script execution.
+- **Elisp Tooling**: Use `eask` for Emacs Lisp development (compile, lint, test).
 - **Editor**: Emacs.
 - **Testing**: Prefer unit tests for routine development. Run integration tests only after significant changes or before a release. Once integration tests are functional, strongly consider creating unit test scenarios based on them using mock data.
 
@@ -11,6 +12,29 @@
 ## Technical Decisions
 - **Language**: Python.
 - **Sync Direction**: Phase 1 is GitHub -> Org.
+
+## Elisp Development with Eask
+After editing `project-to-org.el`, always validate with eask before asking the user to reload:
+
+```bash
+# Compile and check for warnings (replaces check_parens.py)
+eask compile
+
+# Check docstrings
+eask lint checkdoc
+
+# Check package conventions
+eask lint package
+```
+
+Common issues eask catches:
+- Unbalanced parentheses (compile will fail)
+- Obsolete functions (suggests modern replacements)
+- Unused lexical arguments (prefix with `_`)
+- Trailing whitespace
+- Missing dependency declarations
+
+Install dev dependencies with: `eask install-deps --dev`
 
 ## Technical Context & Learnings
 - **Integration Testing**:

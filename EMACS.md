@@ -4,7 +4,7 @@ This document captures potential enhancements for a `project-to-org-mode` minor 
 
 ## Visual Enhancements
 
-### 1. Compact URL Display ⭐
+### 1. Compact URL Display ✅
 **Problem**: Full GitHub URLs are verbose and ugly:
 ```
 :URL: https://github.com/ewilderj/hubber/issues/56
@@ -16,7 +16,7 @@ This document captures potential enhancements for a `project-to-org-mode` minor 
 - Use `display` text properties to hide the full URL but keep it in the buffer
 - Implementation: Use `font-lock` or `jit-lock` to add overlays/text properties
 
-### 2. Inline Metadata Badges ⭐
+### 2. Inline Metadata Badges ✅
 **Current**: Properties drawer takes up 8+ lines per item
 
 **Proposed**: Show key info inline on the heading:

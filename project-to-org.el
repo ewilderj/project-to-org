@@ -3,9 +3,10 @@
 ;; Copyright (C) 2026  Edd Wilder-James
 
 ;; Author: Edd Wilder-James <edd@example.com>
+;; URL: https://github.com/ewilderj/project-to-org
 ;; Version: 0.1.0
 ;; Keywords: tools, org, github
-;; Package-Requires: ((emacs "27.1"))
+;; Package-Requires: ((emacs "29.1"))
 
 ;;; Commentary:
 
@@ -23,7 +24,7 @@
 
 (defcustom project-to-org-python-command "uv run"
   "Command to run the Python script.
-Defaults to 'uv run' which handles dependencies automatically."
+Defaults to \='uv run\=' which handles dependencies automatically."
   :type 'string
   :group 'project-to-org)
 
@@ -69,7 +70,7 @@ Defaults to 'uv run' which handles dependencies automatically."
 
 (defun project-to-org--parse-github-url (url)
   "Parse a GitHub URL and return (owner repo type number).
-TYPE is either 'issue or 'pull-request.
+TYPE is either \='issue or \='pull-request.
 Returns nil if URL is not a recognized GitHub issue/PR URL."
   (when (string-match "https://github\\.com/\\([^/]+\\)/\\([^/]+\\)/\\(issues\\|pull\\)/\\([0-9]+\\)" url)
     (list (match-string 1 url)
@@ -142,9 +143,9 @@ Returns a plist with :issue-number, :assignees, :labels, and :url."
       (let ((issue-text (concat "#" issue-num)))
         (if url
             (let ((map (make-sparse-keymap)))
-              (define-key map [mouse-1] 
+              (define-key map [mouse-1]
                 (lambda () (interactive) (browse-url url)))
-              (define-key map (kbd "RET") 
+              (define-key map (kbd "RET")
                 (lambda () (interactive) (browse-url url)))
               (push (propertize issue-text
                                'face 'project-to-org-issue-badge
@@ -210,7 +211,7 @@ Returns a plist with :issue-number, :assignees, :labels, and :url."
       (goto-char (point-min))
       (while (re-search-forward "^[ \t]*:PROPERTIES:" nil t)
         (beginning-of-line)
-        (org-flag-drawer t)
+        (org-fold-hide-drawer-toggle t)
         (forward-line 1)))))
 
 (defun project-to-org--setup-compact-urls ()
@@ -282,7 +283,7 @@ Requires #+GITHUB_PROJECT_URL to be set in the file."
         :buffer output-buffer
         :stderr error-buffer
         :command (append (split-string project-to-org-python-command) args))
-       (lambda (proc event)
+       (lambda (proc _event)
          (when (eq (process-status proc) 'exit)
            (let ((exit-code (process-exit-status proc)))
              (if (zerop exit-code)
