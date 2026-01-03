@@ -1,0 +1,37 @@
+#+TITLE: ewilderj work
+#+GITHUB_PROJECT_URL: https://github.com/users/ewilderj/projects/1
+#+GITHUB_EXCLUDE_STATUSES: Done
+#+GITHUB_STATUS_MAP: Todo:TODO "In Progress":STRT "Waiting For":WAITING_FOR Someday:WAIT Done:DONE
+#+DATE: 2026-01-02
+#+TODO: TODO STRT WAITING_FOR WAIT | DONE
+#+STARTUP: show2levels
+
+* WAIT Revise doc advising how to use Projects
+:PROPERTIES:
+:ID: PVTI_lAHNJQPOAMs3U84F6gDT
+:URL: https://github.com/ewilderj/hubber/issues/39
+:ISSUE_NUMBER: 39
+:PRIORITY: Low
+:ASSIGNEES: ewilderj
+:END:
+
+https://github.com/github/tpm/blob/main/role/practices/program-schedule-using-memex.md
+
+* STRT address some internal documentation issues
+:PROPERTIES:
+:ID: PVTI_lAHNJQPOAMs3U84GB1rQ
+:URL: https://github.com/ewilderj/hubber/issues/51
+:ISSUE_NUMBER: 51
+:ASSIGNEES: ewilderj
+:LABELS: Todo
+:END:
+
+- [x] - Weekly reporting out of date [bug](https://github.com/github/tpm/issues/2415)
+- [ ] - Identify backlog of high priority items
+
+
+
+* Local Variables :noexport:
+# Local Variables:
+# org-tidy-mode: nil
+# End:
