@@ -121,6 +121,36 @@ For two-way sync:
 - Use **text properties** for URL compacting (survives save/reload)
 - Use **overlays** for dynamic state (sync status, conflicts) that shouldn't persist
 
+### Overlay Display Techniques for Org-mode Folding
+
+When adding visual elements (badges, icons, etc.) to org-mode headlines, the overlay positioning strategy matters significantly for fold behavior:
+
+**Problem**: Org-mode folding uses the `invisible` text property. When a region becomes invisible:
+- `after-string` overlays positioned at the end of headlines disappear (the string is tied to a position that becomes invisible when content is folded)
+- `before-string` overlays on invisible text also disappear
+
+**Solution**: Use the `display` property to **replace** visible text rather than append to it:
+
+```elisp
+;; DON'T: after-string at end of headline (disappears when folded)
+(let ((ov (make-overlay headline-end headline-end)))
+  (overlay-put ov 'after-string badge-text))
+
+;; DO: display property on last character (stays visible when folded)
+(let* ((last-char (buffer-substring-no-properties (1- headline-end) headline-end))
+       (ov (make-overlay (1- headline-end) headline-end nil t)))
+  (overlay-put ov 'display (concat last-char badge-text)))
+```
+
+**Why this works**: 
+1. The overlay covers the **last character** of the headline text (which is always visible)
+2. The `display` property replaces that character with itself + the badge
+3. Since the character being replaced is in the visible headline, the badge stays visible regardless of fold state
+
+**Key insight from Elisp manual**: "If the `display` property is a 'replacing' one, the `invisible` property of the same overlay will be ignored." This means `display` has special priority over visibility.
+
+This technique was discovered by analyzing [org-tidy](https://github.com/jxq0/org-tidy), which uses `display` properties to hide/show drawer content independently of org-mode's folding mechanism.
+
 ### Performance Considerations
 - Use `jit-lock` for on-demand fontification of large files
 - Cache parsed property values

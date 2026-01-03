@@ -63,7 +63,7 @@ Defaults to 'uv run' which handles dependencies automatically."
   :group 'project-to-org)
 
 (defface project-to-org-label-badge
-  '((t :foreground "cyan"))
+  '((t :inherit font-lock-string-face :foreground "cyan"))
   "Face for label badges."
   :group 'project-to-org)
 
@@ -176,15 +176,19 @@ Returns a plist with :issue-number, :assignees, :labels, and :url."
   (when (and project-to-org-inline-metadata
              (re-search-forward org-complex-heading-regexp limit t))
     (let* ((heading-start (match-beginning 0))
-           (badge-pos (match-end 4))  ; End of headline text (group 4)
+           (headline-end (match-end 4))  ; End of headline text (group 4)
+           (last-char-start (1- headline-end))  ; Start of last char
            (metadata (save-excursion
                        (goto-char heading-start)
                        (project-to-org--get-entry-metadata)))
            (badge-text (project-to-org--format-metadata-badges metadata)))
 
-      (when badge-text
-        (let ((ov (make-overlay badge-pos badge-pos)))
-          (overlay-put ov 'after-string badge-text)
+      (when (and badge-text (> headline-end (match-beginning 4)))
+        ;; Create overlay on last character of headline
+        ;; Use 'display property to show last char + badge
+        (let* ((last-char (buffer-substring-no-properties last-char-start headline-end))
+               (ov (make-overlay last-char-start headline-end nil t)))
+          (overlay-put ov 'display (concat last-char badge-text))
           (overlay-put ov 'project-to-org-badge t))))
     t))
 
