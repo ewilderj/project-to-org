@@ -27,8 +27,11 @@ GitHub Projects contain vital information about development state, but this data
 
 ### Phase 2: Two-Way Sync
 *   Detect changes in the local Org file.
-*   Push updates (status changes, text edits) back to GitHub.
+*   Push metadata updates (status changes, assignees, labels, custom fields) back to GitHub.
 *   Handle creation of new items in Org-mode and pushing them to GitHub.
+*   **Body Content Constraint**: Issue/draft bodies remain **read-only** for two-way sync. The Org file displays the GitHub body content (Markdown), but changes to the body in Org will not sync back to GitHub. This prevents data loss from Markdown ↔ Org conversion issues.
+    *   Rationale: Markdown and Org-mode have overlapping but non-identical feature sets. Round-tripping risks losing HTML, formatting nuances, or Org-specific additions.
+    *   Title changes ARE supported as they're plain text.
 
 ### Phase 3: Conflict Resolution & Robustness
 *   Handle concurrent modifications (async changes on GitHub vs. local edits).
@@ -64,9 +67,14 @@ GitHub Projects contain vital information about development state, but this data
 ### 6.2 Persistence & Configuration
 *   **File-Level Metadata**: We store sync configuration directly in the Org file header to make the file self-contained.
     *   `#+GITHUB_PROJECT_URL`: The source of truth for the sync target.
-    *   `#+GITHUB_STATUS_MAP`: A serialized string of the status mapping used. This allows the user to customize the mapping in the file and have the tool respect it (planned for Phase 1.5/2).
+    *   `#+GITHUB_STATUS_MAP`: A serialized string of the status mapping used. This allows the user to customize the mapping in the file and have the tool respect it.
     *   `#+GITHUB_EXCLUDE_STATUSES`: Persists the list of ignored statuses.
 *   **Dynamic TODO Keywords**: The `#+TODO` line is dynamically generated based on the active status map, ensuring that cycling TODO states in Emacs matches the available GitHub statuses.
+
+### 6.4 Two-Way Sync Constraints (Phase 2)
+*   **Bidirectional Fields**: Status, Title, Assignees, Labels, Custom Fields (Iteration, Priority, etc.)
+*   **Read-Only Fields**: Issue/Draft body content. Bodies sync from GitHub → Org but never back.
+*   **Rationale**: Markdown ↔ Org-mode conversion risks data loss (HTML in Markdown, Org-specific features, formatting nuances). Metadata is safe to sync bidirectionally as it's structured data.
 
 ### 6.3 Language & Tooling
 *   **Language**: Python for the core logic (using `requests` or a GraphQL client).
@@ -114,7 +122,6 @@ The following scenarios are fully covered by our test suite:
 *   **Empty Project**: Verified graceful handling of projects with 0 items.
 
 ## 8. Open Questions / To Be Defined
-*   **Tech Stack**: Preferred language for the sync tool (Python, Go, Elisp, etc.)?
 *   **Sync Trigger**: Manual command, file watcher, or cron?
 *   **Org Structure**: Specific hierarchy preferences (flat list vs. grouped by status)?
-*   **Conflict Strategy**: Default behavior for Phase 3?
+*   **Conflict Strategy**: Default behavior for Phase 3 (last-write-wins vs. manual merge)?

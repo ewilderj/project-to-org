@@ -178,13 +178,6 @@ class OrgConverter:
         for item in items:
             lines.extend(self._convert_item(item))
             
-        # Footer with Local Variables
-        lines.append("")
-        lines.append("* Local Variables :noexport:")
-        lines.append("# Local Variables:")
-        lines.append("# org-tidy-mode: nil")
-        lines.append("# End:")
-            
         return "\n".join(lines)
 
     def _convert_item(self, item):
