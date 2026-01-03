@@ -46,12 +46,14 @@ Defaults to 'uv run' which handles dependencies automatically."
 Requires #+GITHUB_PROJECT_URL to be set in the file."
   (interactive)
   (let* ((project-url (project-to-org--get-property "GITHUB_PROJECT_URL"))
-         (exclude-statuses (project-to-org--get-property "GITHUB_EXCLUDE_STATUSES"))
-         (status-map (project-to-org--get-property "GITHUB_STATUS_MAP"))
+         (target-file (buffer-file-name))
          (target-buffer (current-buffer))
          (project-root (file-name-directory (or load-file-name buffer-file-name))))
     (unless project-url
       (user-error "No #+GITHUB_PROJECT_URL property found in this file"))
+    
+    (unless target-file
+      (user-error "Buffer must be saved to a file before syncing"))
     
     (message "Syncing with GitHub Project...")
     
@@ -59,15 +61,8 @@ Requires #+GITHUB_PROJECT_URL to be set in the file."
           (error-buffer (generate-new-buffer "*project-to-org-error*"))
           (default-directory project-root)
           (args (list project-to-org-script-path
-                      "--project-url" project-url)))
-      
-      ;; Handle exclude-statuses
-      (when exclude-statuses
-        (setq args (append args (list "--exclude-statuses") (split-string exclude-statuses))))
-      
-      ;; Handle status-map
-      (when status-map
-        (setq args (append args (list "--status-map" status-map))))
+                      "--project-url" project-url
+                      "--org-file" target-file)))
       
       (set-process-sentinel
        (make-process
@@ -79,13 +74,10 @@ Requires #+GITHUB_PROJECT_URL to be set in the file."
          (when (eq (process-status proc) 'exit)
            (let ((exit-code (process-exit-status proc)))
              (if (zerop exit-code)
-                 (with-current-buffer (process-buffer proc)
-                   (let ((content (buffer-string)))
-                     (with-current-buffer target-buffer
-                       (erase-buffer)
-                       (insert content)
-                       (save-buffer)
-                       (message "Sync complete!"))))
+                 (progn
+                   (with-current-buffer target-buffer
+                     (revert-buffer t t t)
+                     (message "Sync complete!")))
                (with-current-buffer error-buffer
                  (message "Sync failed: %s" (buffer-string))))
              (kill-buffer (process-buffer proc))

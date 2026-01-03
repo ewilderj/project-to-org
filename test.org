@@ -1,9 +1,9 @@
 #+TITLE: ewilderj work
 #+GITHUB_PROJECT_URL: https://github.com/users/ewilderj/projects/1
 #+GITHUB_EXCLUDE_STATUSES: Done
-#+GITHUB_STATUS_MAP: Todo:TODO "In Progress":STRT "Waiting For":WAITING_FOR Someday:WAIT Done:DONE
+#+GITHUB_STATUS_MAP: Todo:TODO "In Progress":STRT "Waiting For":GODOT Someday:WAIT Done:DONE
 #+DATE: 2026-01-02
-#+TODO: TODO STRT WAITING_FOR WAIT | DONE
+#+TODO: TODO STRT GODOT WAIT | DONE
 #+STARTUP: show2levels
 
 * WAIT Revise doc advising how to use Projects
@@ -26,10 +26,11 @@ https://github.com/github/tpm/blob/main/role/practices/program-schedule-using-me
 :LABELS: Todo
 :END:
 
-- [x] - Weekly reporting out of date [bug](https://github.com/github/tpm/issues/2415)
+- [X] - Weekly reporting out of date [bug](https://github.com/github/tpm/issues/2415)
 - [ ] - Identify backlog of high priority items
 
 
+* GODOT do stuff!
 
 * Local Variables :noexport:
 # Local Variables:

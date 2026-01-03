@@ -1,5 +1,21 @@
 import datetime
 import shlex
+import re
+import os
+
+def extract_config_from_org(file_path):
+    """Extract configuration from an existing Org file."""
+    config = {}
+    if not os.path.exists(file_path):
+        return config
+        
+    with open(file_path, 'r') as f:
+        for line in f:
+            if line.startswith("#+GITHUB_STATUS_MAP:"):
+                config['status_map'] = line.split(":", 1)[1].strip()
+            elif line.startswith("#+GITHUB_EXCLUDE_STATUSES:"):
+                config['exclude_statuses'] = line.split(":", 1)[1].strip().split()
+    return config
 
 class OrgConverter:
     def __init__(self, project_data, project_url=None, exclude_statuses=None, status_map_str=None):
@@ -228,10 +244,16 @@ class OrgConverter:
         # Body content
         if body:
             lines.append("")
-            lines.append(body)
+            lines.append(self._process_body(body))
             lines.append("")
             
         return lines
+
+    def _process_body(self, body):
+        """Process the body content to be Org-mode compatible."""
+        # Convert GitHub checkboxes [x] to Org checkboxes [X]
+        # Matches - [x], * [x], + [x] with optional indentation
+        return re.sub(r"^(\s*[-+*]\s+)\[x\]", r"\1[X]", body, flags=re.MULTILINE)
 
     def _parse_field_values(self, nodes):
         """Extract field names and values from the nested GraphQL structure."""

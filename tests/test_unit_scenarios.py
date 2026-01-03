@@ -86,3 +86,34 @@ def test_convert_empty_project():
     assert "* TODO" not in output
     # Should still have default status map if no fields found
     assert "#+GITHUB_STATUS_MAP" in output
+
+def test_convert_checkboxes():
+    """Test converting GitHub markdown checkboxes to Org-mode checkboxes."""
+    body = """
+- [ ] Unchecked item
+- [x] Checked item
+    """
+    mock_data = {
+        "title": "Checkbox Project",
+        "items": {
+            "nodes": [
+                {
+                    "id": "1",
+                    "type": "ISSUE",
+                    "content": {
+                        "title": "Checkbox Issue",
+                        "body": body,
+                        "number": 1,
+                        "url": "http://github.com/issue/1"
+                    },
+                    "fieldValues": {"nodes": []}
+                }
+            ]
+        }
+    }
+    
+    converter = OrgConverter(mock_data)
+    output = converter.convert()
+    
+    assert "- [ ] Unchecked item" in output
+    assert "- [X] Checked item" in output
