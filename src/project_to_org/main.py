@@ -14,6 +14,7 @@ def main():
     parser.add_argument("--project-url", help="GitHub Project URL", required=True)
     parser.add_argument("--exclude-statuses", help="List of statuses to exclude", nargs="*", default=[])
     parser.add_argument("--status-map", help="Status mapping string (e.g. 'Todo=TODO \"In Progress\"=STRT')", required=False)
+    parser.add_argument("--priority-map", help="Priority mapping string (e.g. 'Low=C Medium=B High=A')", required=False)
     
     args = parser.parse_args()
     
@@ -31,6 +32,9 @@ def main():
             
         # Determine status map: CLI > File > None (Default)
         status_map_to_use = args.status_map or existing_config.get('status_map')
+        
+        # Determine priority map: CLI > File > None (Auto-detect)
+        priority_map_to_use = args.priority_map or existing_config.get('priority_map')
         
         # Determine exclude statuses: CLI (if not default empty) > File > CLI Default
         # Note: args.exclude_statuses is a list, default []
@@ -52,7 +56,8 @@ def main():
             project_data, 
             project_url=args.project_url, 
             exclude_statuses=exclude_statuses_to_use,
-            status_map_str=status_map_to_use
+            status_map_str=status_map_to_use,
+            priority_map_str=priority_map_to_use
         )
         org_content = converter.convert()
         

@@ -15,10 +15,12 @@ def extract_config_from_org(file_path):
                 config['status_map'] = line.split(":", 1)[1].strip()
             elif line.startswith("#+GITHUB_EXCLUDE_STATUSES:"):
                 config['exclude_statuses'] = line.split(":", 1)[1].strip().split()
+            elif line.startswith("#+GITHUB_PRIORITY_MAP:"):
+                config['priority_map'] = line.split(":", 1)[1].strip()
     return config
 
 class OrgConverter:
-    def __init__(self, project_data, project_url=None, exclude_statuses=None, status_map_str=None):
+    def __init__(self, project_data, project_url=None, exclude_statuses=None, status_map_str=None, priority_map_str=None):
         self.project_data = project_data
         self.project_url = project_url
         self.exclude_statuses = exclude_statuses or []
@@ -31,6 +33,15 @@ class OrgConverter:
             self.status_map_str = self._generate_status_map_str()
             
         self._validate_status_map()
+        
+        # Priority mapping
+        if priority_map_str:
+            self.priority_map = self._parse_priority_map(priority_map_str)
+            self.priority_map_str = priority_map_str
+            self.priority_scheme = self._detect_priority_scheme_from_map()
+        else:
+            self.priority_map, self.priority_scheme = self._generate_default_priority_map()
+            self.priority_map_str = self._generate_priority_map_str() if self.priority_map else None
 
     def _generate_default_status_map(self):
         """Generate a default status map based on project fields."""
@@ -126,6 +137,137 @@ class OrgConverter:
                 parts.append(f'{key}={value}')
         return " ".join(parts)
 
+    def _get_priority_field_options(self):
+        """Find and return priority field options from project data."""
+        fields = self.project_data.get("fields", {}).get("nodes", [])
+        for field in fields:
+            if field.get("name", "").lower() == "priority":
+                return field.get("options", [])
+        return []
+
+    def _detect_priority_scheme(self, options):
+        """Detect if priority options are text-based or P-numbered."""
+        option_names = [opt["name"].lower() for opt in options]
+        
+        # Check for P-numbered scheme (P0, P1, P2, etc.)
+        p_pattern = re.compile(r'^p\d+$')
+        if all(p_pattern.match(name) for name in option_names):
+            return "p-numbered"
+        
+        # Check for text-based scheme (low, medium, high, etc.)
+        text_keywords = {"low", "medium", "high", "critical", "urgent", "normal"}
+        if any(name in text_keywords for name in option_names):
+            return "text-based"
+        
+        # Unknown scheme - will need explicit mapping
+        return "custom"
+
+    def _generate_default_priority_map(self):
+        """Generate priority mapping based on detected scheme."""
+        options = self._get_priority_field_options()
+        if not options:
+            return {}, None
+        
+        scheme = self._detect_priority_scheme(options)
+        mapping = {}
+        
+        if scheme == "p-numbered":
+            # P0=A, P1=B, P2=C, P3=D, etc.
+            for opt in options:
+                name = opt["name"]
+                match = re.match(r'^[Pp](\d+)$', name)
+                if match:
+                    num = int(match.group(1))
+                    # A=0, B=1, C=2, D=3, etc.
+                    if num <= 25:  # A-Z
+                        mapping[name] = chr(ord('A') + num)
+                        
+        elif scheme == "text-based":
+            # Map common text priorities
+            text_mappings = {
+                "low": "C",
+                "medium": "B", 
+                "high": "A",
+                "critical": "A",
+                "urgent": "A",
+                "normal": "B",
+            }
+            for opt in options:
+                name = opt["name"]
+                lower_name = name.lower()
+                if lower_name in text_mappings:
+                    mapping[name] = text_mappings[lower_name]
+                    
+        else:
+            # Custom scheme - generate sequential letters
+            for i, opt in enumerate(options):
+                if i <= 25:  # A-Z
+                    mapping[opt["name"]] = chr(ord('A') + i)
+        
+        return mapping, scheme
+
+    def _detect_priority_scheme_from_map(self):
+        """Detect scheme from existing priority map."""
+        if not self.priority_map:
+            return None
+        keys = list(self.priority_map.keys())
+        p_pattern = re.compile(r'^[Pp]\d+$')
+        if all(p_pattern.match(k) for k in keys):
+            return "p-numbered"
+        text_keywords = {"low", "medium", "high", "critical", "urgent", "normal"}
+        if any(k.lower() in text_keywords for k in keys):
+            return "text-based"
+        return "custom"
+
+    def _parse_priority_map(self, map_str):
+        """Parse priority map string like 'Low=C Medium=B High=A'."""
+        mapping = {}
+        try:
+            parts = shlex.split(map_str)
+            for part in parts:
+                if '=' in part:
+                    key, value = part.rsplit('=', 1)
+                    mapping[key] = value
+        except Exception:
+            pass
+        return mapping
+
+    def _generate_priority_map_str(self):
+        """Generate priority map string for persistence."""
+        if not self.priority_map:
+            return None
+        parts = []
+        for key, value in self.priority_map.items():
+            if " " in key:
+                parts.append(f'"{key}"={value}')
+            else:
+                parts.append(f'{key}={value}')
+        return " ".join(parts)
+
+    def _get_priorities_header(self):
+        """Generate #+PRIORITIES header based on scheme."""
+        if not self.priority_map:
+            return None
+        
+        values = list(self.priority_map.values())
+        if not values:
+            return None
+            
+        # Sort to find min and max
+        sorted_values = sorted(values)
+        max_pri = sorted_values[0]   # A is highest (lowest letter)
+        min_pri = sorted_values[-1]  # C/D is lowest (highest letter)
+        
+        # Default priority
+        if self.priority_scheme == "p-numbered":
+            # Managers think everything is P0, so default to A
+            default_pri = "A"
+        else:
+            # For text-based, default to middle (B)
+            default_pri = "B" if "B" in values else max_pri
+            
+        return f"#+PRIORITIES: {max_pri} {min_pri} {default_pri}"
+
     def convert(self):
         """Convert project data to Org-mode string."""
         lines = []
@@ -142,7 +284,16 @@ class OrgConverter:
         # Persist the status map
         lines.append(f"#+GITHUB_STATUS_MAP: {self.status_map_str}")
         
+        # Persist the priority map if we have one
+        if self.priority_map_str:
+            lines.append(f"#+GITHUB_PRIORITY_MAP: {self.priority_map_str}")
+        
         lines.append(f"#+DATE: {datetime.date.today()}")
+        
+        # Generate #+PRIORITIES line if we have priority mapping
+        priorities_header = self._get_priorities_header()
+        if priorities_header:
+            lines.append(priorities_header)
         
         # Generate #+TODO line dynamically
         todo_keywords = []
@@ -203,9 +354,17 @@ class OrgConverter:
         if status in self.exclude_statuses:
             return []
         
+        # Determine priority cookie if Priority field exists
+        priority_cookie = ""
+        priority_value = fields.get("Priority")
+        if priority_value and self.priority_map:
+            org_priority = self.priority_map.get(priority_value)
+            if org_priority:
+                priority_cookie = f" [#{org_priority}]"
+        
         # Build heading
         lines = []
-        lines.append(f"* {todo_keyword} {title}")
+        lines.append(f"* {todo_keyword}{priority_cookie} {title}")
         
         # Properties drawer
         lines.append(":PROPERTIES:")

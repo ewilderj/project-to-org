@@ -2,11 +2,13 @@
 #+GITHUB_PROJECT_URL: https://github.com/users/ewilderj/projects/1
 #+GITHUB_EXCLUDE_STATUSES: Done
 #+GITHUB_STATUS_MAP: Todo=TODO "In Progress"=STRT "Waiting For"=WAITING_FOR Someday=WAIT Done=DONE
+#+GITHUB_PRIORITY_MAP: High=A Normal=B Low=C
 #+DATE: 2026-01-03
+#+PRIORITIES: A C B
 #+TODO: TODO STRT WAITING_FOR WAIT | DONE
 #+STARTUP: show2levels
 
-* WAIT Revise doc advising how to use Projects
+* WAIT [#C] Revise doc advising how to use Projects
 :PROPERTIES:
 :ID: PVTI_lAHNJQPOAMs3U84F6gDT
 :URL: https://github.com/ewilderj/hubber/issues/39

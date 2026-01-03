@@ -310,3 +310,212 @@ def test_todo_line_generation_custom_statuses():
     
     assert "#+TODO: WAIT CODING SHIPPED" in output
     # No pipe because no recognized done state
+
+
+# ============================================================================
+# Priority Mapping Tests
+# ============================================================================
+
+def test_priority_text_based_detection():
+    """Test that Low/Medium/High priority scheme is detected and mapped."""
+    project_data = {
+        "items": {"nodes": []},
+        "fields": {
+            "nodes": [
+                {
+                    "name": "Priority",
+                    "options": [
+                        {"name": "Low"},
+                        {"name": "Medium"},
+                        {"name": "High"}
+                    ]
+                }
+            ]
+        }
+    }
+    
+    converter = OrgConverter(project_data)
+    
+    assert converter.priority_scheme == "text-based"
+    assert converter.priority_map == {"Low": "C", "Medium": "B", "High": "A"}
+    
+    output = converter.convert()
+    assert "#+PRIORITIES: A C B" in output
+    assert "#+GITHUB_PRIORITY_MAP: Low=C Medium=B High=A" in output
+
+
+def test_priority_p_numbered_detection():
+    """Test that P0/P1/P2 priority scheme is detected and mapped."""
+    project_data = {
+        "items": {"nodes": []},
+        "fields": {
+            "nodes": [
+                {
+                    "name": "Priority",
+                    "options": [
+                        {"name": "P0"},
+                        {"name": "P1"},
+                        {"name": "P2"}
+                    ]
+                }
+            ]
+        }
+    }
+    
+    converter = OrgConverter(project_data)
+    
+    assert converter.priority_scheme == "p-numbered"
+    assert converter.priority_map == {"P0": "A", "P1": "B", "P2": "C"}
+    
+    output = converter.convert()
+    # P-numbered defaults to A (managers think everything is P0)
+    assert "#+PRIORITIES: A C A" in output
+    assert "#+GITHUB_PRIORITY_MAP: P0=A P1=B P2=C" in output
+
+
+def test_priority_p_numbered_extended():
+    """Test P0-P3 scheme extends to D."""
+    project_data = {
+        "items": {"nodes": []},
+        "fields": {
+            "nodes": [
+                {
+                    "name": "Priority",
+                    "options": [
+                        {"name": "P0"},
+                        {"name": "P1"},
+                        {"name": "P2"},
+                        {"name": "P3"}
+                    ]
+                }
+            ]
+        }
+    }
+    
+    converter = OrgConverter(project_data)
+    
+    assert converter.priority_map == {"P0": "A", "P1": "B", "P2": "C", "P3": "D"}
+    
+    output = converter.convert()
+    assert "#+PRIORITIES: A D A" in output
+
+
+def test_priority_in_heading():
+    """Test that priority cookie is added to headings."""
+    project_data = {
+        "items": {
+            "nodes": [
+                {
+                    "id": "item1",
+                    "type": "ISSUE",
+                    "content": {
+                        "title": "High priority task",
+                        "body": "",
+                        "number": 1,
+                        "url": "http://example.com/1",
+                        "assignees": {"nodes": []},
+                        "labels": {"nodes": []}
+                    },
+                    "fieldValues": {
+                        "nodes": [
+                            {"name": "Todo", "field": {"name": "Status"}},
+                            {"name": "High", "field": {"name": "Priority"}}
+                        ]
+                    }
+                },
+                {
+                    "id": "item2",
+                    "type": "ISSUE",
+                    "content": {
+                        "title": "Low priority task",
+                        "body": "",
+                        "number": 2,
+                        "url": "http://example.com/2",
+                        "assignees": {"nodes": []},
+                        "labels": {"nodes": []}
+                    },
+                    "fieldValues": {
+                        "nodes": [
+                            {"name": "Todo", "field": {"name": "Status"}},
+                            {"name": "Low", "field": {"name": "Priority"}}
+                        ]
+                    }
+                }
+            ]
+        },
+        "fields": {
+            "nodes": [
+                {
+                    "name": "Priority",
+                    "options": [
+                        {"name": "Low"},
+                        {"name": "Medium"},
+                        {"name": "High"}
+                    ]
+                }
+            ]
+        }
+    }
+    
+    converter = OrgConverter(project_data)
+    output = converter.convert()
+    
+    assert "* TODO [#A] High priority task" in output
+    assert "* TODO [#C] Low priority task" in output
+
+
+def test_priority_persistence():
+    """Test that priority map is persisted and read from file."""
+    from project_to_org.org_converter import extract_config_from_org
+    import tempfile
+    
+    org_content = """#+TITLE: Test
+#+GITHUB_PRIORITY_MAP: Critical=A Normal=B Deferred=C
+"""
+    
+    with tempfile.NamedTemporaryFile(mode='w', suffix='.org', delete=False) as f:
+        f.write(org_content)
+        f.flush()
+        
+        config = extract_config_from_org(f.name)
+        assert config.get('priority_map') == "Critical=A Normal=B Deferred=C"
+        
+        # Clean up
+        import os
+        os.unlink(f.name)
+
+
+def test_priority_custom_map_from_string():
+    """Test that custom priority map is parsed from string."""
+    project_data = {
+        "items": {"nodes": []},
+        "fields": {"nodes": []}
+    }
+    
+    converter = OrgConverter(project_data, priority_map_str="Critical=A Normal=B Deferred=C")
+    
+    assert converter.priority_map == {"Critical": "A", "Normal": "B", "Deferred": "C"}
+    
+    output = converter.convert()
+    assert "#+GITHUB_PRIORITY_MAP: Critical=A Normal=B Deferred=C" in output
+
+
+def test_no_priority_field():
+    """Test that no priority headers are generated when no priority field exists."""
+    project_data = {
+        "items": {"nodes": []},
+        "fields": {
+            "nodes": [
+                {
+                    "name": "Status",
+                    "options": [{"name": "Todo"}, {"name": "Done"}]
+                }
+            ]
+        }
+    }
+    
+    converter = OrgConverter(project_data)
+    output = converter.convert()
+    
+    assert "#+PRIORITIES:" not in output
+    assert "#+GITHUB_PRIORITY_MAP:" not in output

@@ -76,6 +76,42 @@ GitHub Projects contain vital information about development state, but this data
 *   **Read-Only Fields**: Issue/Draft body content. Bodies sync from GitHub → Org but never back.
 *   **Rationale**: Markdown ↔ Org-mode conversion risks data loss (HTML in Markdown, Org-specific features, formatting nuances). Metadata is safe to sync bidirectionally as it's structured data.
 
+### 6.5 Priority Mapping
+*   **Purpose**: Map GitHub Project Priority custom fields to Org-mode's native priority system (`[#A]`, `[#B]`, `[#C]`, etc.).
+*   **Org-mode Priority Syntax**: `#+PRIORITIES: MAX MIN DEFAULT` (e.g., `#+PRIORITIES: A C B` means max=A, min=C, default=B).
+*   **Automatic Detection**: The tool detects the priority field's naming scheme and applies heuristics:
+
+#### Text-Based Priorities (Low/Medium/High)
+*   **Pattern**: Priority field options like "Low", "Medium", "High" (case-insensitive).
+*   **Mapping**:
+    *   `Low` → `[#C]`
+    *   `Medium` → `[#B]`
+    *   `High` → `[#A]`
+*   **Header**: `#+PRIORITIES: A C B` (max=A, min=C, default=B).
+
+#### P-Numbered Priorities (P0/P1/P2/P3)
+*   **Pattern**: Priority field options like "P0", "P1", "P2", "P3" (Google-style).
+*   **Mapping**:
+    *   `P0` → `[#A]`
+    *   `P1` → `[#B]`
+    *   `P2` → `[#C]`
+    *   `P3` → `[#D]` (extends beyond default A-C range)
+*   **Header**: `#+PRIORITIES: A D A` (max=A, min=D, default=A).
+    *   **Rationale for Default=A**: Reflects the reality that "managers think everything is a P0" — new items default to highest priority unless explicitly downgraded.
+
+#### Persistence & Repeatability
+*   **Heuristics First**: The tool infers the mapping from the priority field's option names (text vs. P-numbered).
+*   **Fallback Mechanism**: If heuristics fail (e.g., custom priority names like "Critical", "Normal", "Deferred"), store an explicit mapping in a new header:
+    *   `#+GITHUB_PRIORITY_MAP: Critical=A Normal=B Deferred=C`
+    *   Format: Space-separated `Key=Value` pairs where `Key` is the GitHub priority option name and `Value` is the Org priority letter.
+*   **User Overrides**: Users can manually edit `#+GITHUB_PRIORITY_MAP` in the Org file to customize mappings. The tool will respect these on subsequent syncs.
+*   **Repeatability**: Once a mapping is established (either via heuristics or explicit header), it persists across syncs to ensure consistency.
+
+#### Implementation Notes
+*   Priority mappings are applied during Org file generation, adding `[#X]` after the TODO keyword in each heading.
+*   The `#+PRIORITIES` line is dynamically generated based on the detected or stored mapping.
+*   If no Priority field exists in the GitHub Project, no priority syntax is added to the Org file.
+
 ### 6.3 Language & Tooling
 *   **Language**: Python for the core logic (using `requests` or a GraphQL client).
 *   **Integration**: Emacs Lisp (Elisp) will eventually wrap the Python tool.
