@@ -46,3 +46,6 @@ Install dev dependencies with: `eask install-deps --dev`
   - Use raw GraphQL mutations (`updateProjectV2Field`) for setting up complex test states (Custom Statuses).
 - **Edge Cases**:
   - Draft issues and complex Markdown content require specific parsing logic, now covered by `tests/test_unit_scenarios.py`.
+- **Elisp Overlay Approach**:
+  - Metadata badges use `'display` property overlays on the last character of headlines.
+  - **Do NOT change to `after-string`** - the `display` approach is required for correct folding behavior when headlines are collapsed.

@@ -15,6 +15,7 @@ def main():
     parser.add_argument("--exclude-statuses", help="List of statuses to exclude", nargs="*", default=[])
     parser.add_argument("--status-map", help="Status mapping string (e.g. 'Todo=TODO \"In Progress\"=STRT')", required=False)
     parser.add_argument("--priority-map", help="Priority mapping string (e.g. 'Low=C Medium=B High=A')", required=False)
+    parser.add_argument("--no-local-variables", help="Don't add Local Variables block to enable project-to-org-mode", action="store_true", default=False)
     
     args = parser.parse_args()
     
@@ -61,7 +62,8 @@ def main():
             exclude_statuses=exclude_statuses_to_use,
             status_map_str=status_map_to_use,
             priority_map_str=priority_map_to_use,
-            status_colors_str=status_colors_to_use
+            status_colors_str=status_colors_to_use,
+            add_local_variables=not args.no_local_variables
         )
         org_content = converter.convert()
         

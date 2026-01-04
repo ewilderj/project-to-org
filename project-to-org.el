@@ -51,27 +51,46 @@ Defaults to \='uv run\=' which handles dependencies automatically."
   :type 'boolean
   :group 'project-to-org)
 
+(defcustom project-to-org-issue-prefix "#"
+  "Prefix string for issue number badges."
+  :type 'string
+  :group 'project-to-org)
+
+(defcustom project-to-org-assignee-prefix "👤 "
+  "Prefix string for assignee badges."
+  :type 'string
+  :group 'project-to-org)
+
+(defcustom project-to-org-label-prefix "🏷️ "
+  "Prefix string for label badges."
+  :type 'string
+  :group 'project-to-org)
+
 (defface project-to-org-compact-url
   '((t :inherit org-link :underline t))
   "Face for compact GitHub URL display."
   :group 'project-to-org)
 
 (defface project-to-org-issue-badge
-  '((t
-     :inherit font-lock-constant-face
-     :weight bold
-     :underline t
-     :height 1.0))
+  '((t :height 1.0 :weight bold :underline t :foreground "gray"))
   "Face for issue number badges."
   :group 'project-to-org)
 
 (defface project-to-org-assignee-badge
-  '((t :inherit font-lock-variable-name-face :height 1.0))
+  '((t
+     :height 0.8
+     :weight regular
+     :width condensed
+     :foreground "white"))
   "Face for assignee badges."
   :group 'project-to-org)
 
 (defface project-to-org-label-badge
-  '((t :inherit font-lock-string-face :foreground "cyan" :height 1.0))
+  '((t
+     :height 0.8
+     :weight regular
+     :width condensed
+     :foreground "cyan"))
   "Face for label badges."
   :group 'project-to-org)
 
@@ -177,7 +196,8 @@ Returns a plist with :issue-number, :assignees, :labels, and :url."
         (url (plist-get metadata :url)))
 
     (when issue-num
-      (let ((issue-text (concat "#" issue-num)))
+      (let ((issue-text
+             (concat project-to-org-issue-prefix issue-num)))
         (if url
             (let ((map (make-sparse-keymap)))
               (define-key
@@ -207,13 +227,15 @@ Returns a plist with :issue-number, :assignees, :labels, and :url."
 
     (when assignees
       (push (propertize (concat
-                         "👤 " (mapconcat 'identity assignees ", "))
+                         project-to-org-assignee-prefix
+                         (mapconcat 'identity assignees ", "))
                         'face 'project-to-org-assignee-badge)
             parts))
 
     (when labels
       (push (propertize (concat
-                         "🏷️ " (mapconcat 'identity labels ", "))
+                         project-to-org-label-prefix
+                         (mapconcat 'identity labels ", "))
                         'face 'project-to-org-label-badge)
             parts))
 
@@ -275,17 +297,17 @@ Returns a plist with :issue-number, :assignees, :labels, and :url."
         (forward-line 1)))))
 
 (defconst project-to-org--github-color-map
-  '(("GRAY" . (:foreground "#d8dadd" :background "#57606a"))
-    ("BLUE" . (:foreground "#b6e3ff" :background "#0550ae"))
-    ("GREEN" . (:foreground "#aceebb" :background "#1a7f37"))
-    ("YELLOW" . (:foreground "#f5e08a" :background "#7d5e08"))
-    ("ORANGE" . (:foreground "#ffd8b5" :background "#bc4c00"))
-    ("RED" . (:foreground "#ffc1c0" :background "#cf222e"))
-    ("PINK" . (:foreground "#f9c9e2" :background "#bf3989"))
-    ("PURPLE" . (:foreground "#e8d5f9" :background "#6639ba")))
+  '(("GRAY" . (:foreground "#57606a" :background "#d8dadd"))
+    ("BLUE" . (:foreground "#0550ae" :background "#b6e3ff"))
+    ("GREEN" . (:foreground "#1a7f37" :background "#aceebb"))
+    ("YELLOW" . (:foreground "#7d5e08" :background "#f5e08a"))
+    ("ORANGE" . (:foreground "#bc4c00" :background "#ffd8b5"))
+    ("RED" . (:foreground "#cf222e" :background "#ffc1c0"))
+    ("PINK" . (:foreground "#bf3989" :background "#f9c9e2"))
+    ("PURPLE" . (:foreground "#6639ba" :background "#e8d5f9")))
   "Map GitHub project colors to Emacs face specs.
 Each entry is (GITHUB-COLOR . (:foreground FG :background BG)).
-Colors are swapped to account for Org TODO face rendering.")
+Foreground is the dark text color, background is the light fill color.")
 
 (defvar-local project-to-org--status-color-overlays nil
   "List of overlays used for status color highlighting.")

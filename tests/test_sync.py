@@ -927,3 +927,36 @@ def test_markdown_github_mentions_to_org():
     assert "[[https://github.com/rowlandm][@rowlandm]]" in output
     assert "[[https://github.com/some-user][@some-user]]" in output
     assert "@rowlandm" not in output.replace("[@rowlandm]", "")  # No bare @mentions
+
+
+def test_local_variables_block_default():
+    """Test that local variables block is added by default."""
+    project_data = {
+        "title": "Test",
+        "items": {"nodes": []},
+        "fields": {"nodes": []}
+    }
+    
+    converter = OrgConverter(project_data)
+    output = converter.convert()
+    
+    assert "* COMMENT Local Variables" in output
+    assert "# Local Variables:" in output
+    assert "# eval: (project-to-org-mode 1)" in output
+    assert "# End:" in output
+
+
+def test_local_variables_block_disabled():
+    """Test that local variables block can be disabled."""
+    project_data = {
+        "title": "Test",
+        "items": {"nodes": []},
+        "fields": {"nodes": []}
+    }
+    
+    converter = OrgConverter(project_data, add_local_variables=False)
+    output = converter.convert()
+    
+    assert "* COMMENT Local Variables" not in output
+    assert "# Local Variables:" not in output
+    assert "# eval: (project-to-org-mode 1)" not in output

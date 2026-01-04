@@ -22,10 +22,11 @@ def extract_config_from_org(file_path):
     return config
 
 class OrgConverter:
-    def __init__(self, project_data, project_url=None, exclude_statuses=None, status_map_str=None, priority_map_str=None, status_colors_str=None):
+    def __init__(self, project_data, project_url=None, exclude_statuses=None, status_map_str=None, priority_map_str=None, status_colors_str=None, add_local_variables=True):
         self.project_data = project_data
         self.project_url = project_url
         self.exclude_statuses = exclude_statuses or []
+        self.add_local_variables = add_local_variables
         
         if status_map_str:
             self.status_map = self._parse_status_map(status_map_str)
@@ -381,6 +382,14 @@ class OrgConverter:
         items = self.project_data.get("items", {}).get("nodes", [])
         for item in items:
             lines.extend(self._convert_item(item))
+        
+        # Add local variables block to auto-enable project-to-org-mode
+        if self.add_local_variables:
+            lines.append("")
+            lines.append("* COMMENT Local Variables")
+            lines.append("# Local Variables:")
+            lines.append("# eval: (project-to-org-mode 1)")
+            lines.append("# End:")
             
         return "\n".join(lines)
 
