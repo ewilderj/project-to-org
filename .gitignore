@@ -5,6 +5,8 @@ __pycache__/
 .pytest_cache/
 .env
 .DS_Store
+test2.org
+test3.org
 
 # Eask (Elisp build tool)
 .eask/

@@ -463,6 +463,9 @@ class OrgConverter:
         """Convert GitHub Markdown body to Org-mode syntax."""
         text = body
         
+        # 0. Normalize line endings (remove Windows CR characters)
+        text = text.replace('\r\n', '\n').replace('\r', '\n')
+        
         # 1. Code blocks (do first to protect content inside)
         # ```language\ncode\n``` → #+BEGIN_SRC language\ncode\n#+END_SRC
         text = re.sub(
@@ -508,7 +511,11 @@ class OrgConverter:
         # 11. Horizontal rules: --- or *** or ___ → -----
         text = re.sub(r'^(---+|\*\*\*+|___+)\s*$', r'-----', text, flags=re.MULTILINE)
         
-        # 12. Headers: # H1, ## H2 → not converted (would conflict with org headings)
+        # 12. GitHub @mentions: @username → [[https://github.com/username][@username]]
+        text = re.sub(r'(?<![a-zA-Z0-9])@([a-zA-Z0-9][-a-zA-Z0-9]*)', 
+                      r'[[https://github.com/\1][@\1]]', text)
+        
+        # 13. Headers: # H1, ## H2 → not converted (would conflict with org headings)
         # Leave as-is or could prefix with "* " but that creates sub-headings
         
         return text

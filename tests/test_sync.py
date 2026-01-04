@@ -899,3 +899,31 @@ def test_markdown_checkbox_to_org():
     assert "- [X] Done task" in output
     assert "- [ ] Pending task" in output
     assert "- [x]" not in output
+
+
+def test_markdown_github_mentions_to_org():
+    """Test GitHub @mentions become profile links."""
+    project_data = {
+        "title": "Test",
+        "items": {"nodes": [{
+            "id": "1",
+            "type": "ISSUE",
+            "content": {
+                "title": "Test",
+                "body": "Thanks @rowlandm and @some-user for the help!",
+                "number": 1,
+                "url": "http://example.com",
+                "assignees": {"nodes": []},
+                "labels": {"nodes": []}
+            },
+            "fieldValues": {"nodes": [{"name": "Todo", "field": {"name": "Status"}}]}
+        }]},
+        "fields": {"nodes": [{"name": "Status", "options": [{"name": "Todo"}]}]}
+    }
+    
+    converter = OrgConverter(project_data)
+    output = converter.convert()
+    
+    assert "[[https://github.com/rowlandm][@rowlandm]]" in output
+    assert "[[https://github.com/some-user][@some-user]]" in output
+    assert "@rowlandm" not in output.replace("[@rowlandm]", "")  # No bare @mentions
