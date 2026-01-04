@@ -17,6 +17,9 @@
 After editing `project-to-org.el`, always validate with eask before asking the user to reload:
 
 ```bash
+# Format code consistently
+eask fmt elisp-autofmt project-to-org.el
+
 # Compile and check for warnings (replaces check_parens.py)
 eask compile
 

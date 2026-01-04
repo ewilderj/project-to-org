@@ -28,7 +28,10 @@ Defaults to \='uv run\=' which handles dependencies automatically."
   :type 'string
   :group 'project-to-org)
 
-(defcustom project-to-org-script-path (expand-file-name "src/project_to_org/main.py" (file-name-directory (or load-file-name buffer-file-name)))
+(defcustom project-to-org-script-path
+  (expand-file-name "src/project_to_org/main.py"
+                    (file-name-directory
+                     (or load-file-name buffer-file-name)))
   "Path to the Python script."
   :type 'file
   :group 'project-to-org)
@@ -72,11 +75,16 @@ Defaults to \='uv run\=' which handles dependencies automatically."
   "Parse a GitHub URL and return (owner repo type number).
 TYPE is either \='issue or \='pull-request.
 Returns nil if URL is not a recognized GitHub issue/PR URL."
-  (when (string-match "https://github\\.com/\\([^/]+\\)/\\([^/]+\\)/\\(issues\\|pull\\)/\\([0-9]+\\)" url)
-    (list (match-string 1 url)
-          (match-string 2 url)
-          (if (string= (match-string 3 url) "issues") 'issue 'pull-request)
-          (match-string 4 url))))
+  (when
+      (string-match
+       "https://github\\.com/\\([^/]+\\)/\\([^/]+\\)/\\(issues\\|pull\\)/\\([0-9]+\\)"
+       url)
+    (list
+     (match-string 1 url) (match-string 2 url)
+     (if (string= (match-string 3 url) "issues")
+         'issue
+       'pull-request)
+     (match-string 4 url))))
 
 (defun project-to-org--compact-url-string (url)
   "Convert a GitHub URL to compact format (owner/repo#123)."
@@ -93,22 +101,39 @@ Returns nil if URL is not a recognized GitHub issue/PR URL."
          (compact (project-to-org--compact-url-string url)))
     (when compact
       (let ((map (make-sparse-keymap)))
-        (define-key map [mouse-1]
-          (lambda () (interactive) (browse-url url)))
-        (define-key map (kbd "RET")
-          (lambda () (interactive) (browse-url url)))
-        (define-key map [mouse-2]
-          (lambda () (interactive) (kill-new url) (message "Copied: %s" url)))
-        (define-key map (kbd "C-c C-c")
-          (lambda () (interactive) (kill-new url) (message "Copied: %s" url)))
+        (define-key
+         map [mouse-1]
+         (lambda ()
+           (interactive)
+           (browse-url url)))
+        (define-key
+         map (kbd "RET")
+         (lambda ()
+           (interactive)
+           (browse-url url)))
+        (define-key
+         map [mouse-2]
+         (lambda ()
+           (interactive)
+           (kill-new url)
+           (message "Copied: %s" url)))
+        (define-key
+         map (kbd "C-c C-c")
+         (lambda ()
+           (interactive)
+           (kill-new url)
+           (message "Copied: %s" url)))
 
         (with-silent-modifications
           (put-text-property start end 'display compact)
-          (put-text-property start end 'face 'project-to-org-compact-url)
+          (put-text-property
+           start end 'face 'project-to-org-compact-url)
           (put-text-property start end 'keymap map)
           (put-text-property start end 'mouse-face 'highlight)
-          (put-text-property start end 'help-echo
-                           (format "%s\nmouse-1: open in browser\nmouse-2: copy URL" url))
+          (put-text-property
+           start end 'help-echo
+           (format "%s\nmouse-1: open in browser\nmouse-2: copy URL"
+                   url))
           (put-text-property start end 'project-to-org-url t))))))
 
 (defun project-to-org--compact-urls-in-buffer ()
@@ -116,8 +141,11 @@ Returns nil if URL is not a recognized GitHub issue/PR URL."
   (when project-to-org-compact-urls
     (save-excursion
       (goto-char (point-min))
-      (while (re-search-forward ":URL: \\(https://github\\.com/[^ \n]+\\)" nil t)
-        (project-to-org--buttonize-url (match-beginning 1) (match-end 1))))))
+      (while (re-search-forward
+              ":URL: \\(https://github\\.com/[^ \n]+\\)"
+              nil t)
+        (project-to-org--buttonize-url
+         (match-beginning 1) (match-end 1))))))
 
 (defun project-to-org--get-entry-metadata ()
   "Extract metadata from the current entry's properties drawer.
@@ -126,10 +154,15 @@ Returns a plist with :issue-number, :assignees, :labels, and :url."
         (assignees (org-entry-get nil "ASSIGNEES"))
         (labels (org-entry-get nil "LABELS"))
         (url (org-entry-get nil "URL")))
-    (list :issue-number issue-number
-          :assignees (when assignees (split-string assignees ", " t))
-          :labels (when labels (split-string labels ", " t))
-          :url url)))
+    (list
+     :issue-number issue-number
+     :assignees
+     (when assignees
+       (split-string assignees ", " t))
+     :labels
+     (when labels
+       (split-string labels ", " t))
+     :url url)))
 
 (defun project-to-org--format-metadata-badges (metadata)
   "Format METADATA plist into a string with badges."
@@ -143,30 +176,41 @@ Returns a plist with :issue-number, :assignees, :labels, and :url."
       (let ((issue-text (concat "#" issue-num)))
         (if url
             (let ((map (make-sparse-keymap)))
-              (define-key map [mouse-1]
-                (lambda () (interactive) (browse-url url)))
-              (define-key map (kbd "RET")
-                (lambda () (interactive) (browse-url url)))
+              (define-key
+               map [mouse-1]
+               (lambda ()
+                 (interactive)
+                 (browse-url url)))
+              (define-key
+               map (kbd "RET")
+               (lambda ()
+                 (interactive)
+                 (browse-url url)))
               (push (propertize issue-text
-                               'face 'project-to-org-issue-badge
-                               'keymap map
-                               'mouse-face 'highlight
-                               'help-echo (format "mouse-1: open %s" url))
+                                'face
+                                'project-to-org-issue-badge
+                                'keymap
+                                map
+                                'mouse-face
+                                'highlight
+                                'help-echo
+                                (format "mouse-1: open %s" url))
                     parts))
           (push (propertize issue-text
-                           'face 'project-to-org-issue-badge)
+                            'face
+                            'project-to-org-issue-badge)
                 parts))))
 
     (when assignees
-      (push (propertize
-             (concat "👤 " (mapconcat 'identity assignees ", "))
-             'face 'project-to-org-assignee-badge)
+      (push (propertize (concat
+                         "👤 " (mapconcat 'identity assignees ", "))
+                        'face 'project-to-org-assignee-badge)
             parts))
-    
+
     (when labels
-      (push (propertize
-             (concat "🏷️ " (mapconcat 'identity labels ", "))
-             'face 'project-to-org-label-badge)
+      (push (propertize (concat
+                         "🏷️ " (mapconcat 'identity labels ", "))
+                        'face 'project-to-org-label-badge)
             parts))
 
     (when parts
@@ -179,14 +223,17 @@ Returns a plist with :issue-number, :assignees, :labels, and :url."
     (let* ((heading-start (match-beginning 0))
            ;; Group 4 is the headline text, but it can be nil
            ;; Fall back to end of line if no headline text
-           (headline-end (or (match-end 4)
-                             (save-excursion
-                               (goto-char heading-start)
-                               (line-end-position))))
-           (metadata (save-excursion
-                       (goto-char heading-start)
-                       (project-to-org--get-entry-metadata)))
-           (badge-text (project-to-org--format-metadata-badges metadata)))
+           (headline-end
+            (or (match-end 4)
+                (save-excursion
+                  (goto-char heading-start)
+                  (line-end-position))))
+           (metadata
+            (save-excursion
+              (goto-char heading-start)
+              (project-to-org--get-entry-metadata)))
+           (badge-text
+            (project-to-org--format-metadata-badges metadata)))
 
       (when (and badge-text
                  headline-end
@@ -194,7 +241,9 @@ Returns a plist with :issue-number, :assignees, :labels, and :url."
         ;; Create overlay on last character of headline
         ;; Use 'display property to show last char + badge
         (let* ((last-char-start (1- headline-end))
-               (last-char (buffer-substring-no-properties last-char-start headline-end))
+               (last-char
+                (buffer-substring-no-properties
+                 last-char-start headline-end))
                (ov (make-overlay last-char-start headline-end nil t)))
           (overlay-put ov 'display (concat last-char badge-text))
           (overlay-put ov 'project-to-org-badge t))))
@@ -222,13 +271,13 @@ Returns a plist with :issue-number, :assignees, :labels, and :url."
         (forward-line 1)))))
 
 (defconst project-to-org--github-color-map
-  '(("GRAY"   . (:foreground "#d8dadd" :background "#57606a"))
-    ("BLUE"   . (:foreground "#b6e3ff" :background "#0550ae"))
-    ("GREEN"  . (:foreground "#aceebb" :background "#1a7f37"))
+  '(("GRAY" . (:foreground "#d8dadd" :background "#57606a"))
+    ("BLUE" . (:foreground "#b6e3ff" :background "#0550ae"))
+    ("GREEN" . (:foreground "#aceebb" :background "#1a7f37"))
     ("YELLOW" . (:foreground "#f5e08a" :background "#7d5e08"))
     ("ORANGE" . (:foreground "#ffd8b5" :background "#bc4c00"))
-    ("RED"    . (:foreground "#ffc1c0" :background "#cf222e"))
-    ("PINK"   . (:foreground "#f9c9e2" :background "#bf3989"))
+    ("RED" . (:foreground "#ffc1c0" :background "#cf222e"))
+    ("PINK" . (:foreground "#f9c9e2" :background "#bf3989"))
     ("PURPLE" . (:foreground "#e8d5f9" :background "#6639ba")))
   "Map GitHub project colors to Emacs face specs.
 Each entry is (GITHUB-COLOR . (:foreground FG :background BG)).
@@ -243,7 +292,8 @@ Colors are swapped to account for Org TODO face rendering.")
     (let ((pairs '()))
       (dolist (part (split-string colors-str " " t))
         (when (string-match "\\([^=]+\\)=\\([^=]+\\)" part)
-          (push (cons (match-string 1 part) (match-string 2 part)) pairs)))
+          (push
+           (cons (match-string 1 part) (match-string 2 part)) pairs)))
       (nreverse pairs))))
 
 (defun project-to-org--remove-status-color-overlays ()
@@ -261,36 +311,50 @@ Accounts for org-modern applying `:inverse-video' to non-done states only."
       (let ((todo-start (match-beginning 2))
             (todo-end (match-end 2)))
         (when (and todo-start todo-end)
-          (let* ((todo-keyword (match-string 2))
-                 (github-color (cdr (assoc todo-keyword status-colors)))
-                 (color-spec (when github-color
-                               (cdr (assoc github-color
-                                           project-to-org--github-color-map))))
-                 ;; org-modern applies :inverse-video to non-done states only
-                 ;; so we need different color ordering for done states
-                 (is-done (member todo-keyword org-done-keywords)))
+          (let*
+              ((todo-keyword (match-string 2))
+               (github-color (cdr (assoc todo-keyword status-colors)))
+               (color-spec
+                (when github-color
+                  (cdr
+                   (assoc
+                    github-color project-to-org--github-color-map))))
+               ;; org-modern applies :inverse-video to non-done states only
+               ;; so we need different color ordering for done states
+               (is-done (member todo-keyword org-done-keywords)))
             (when color-spec
-              (let* ((ov (make-overlay todo-start todo-end nil t))
-                     ;; For non-done: use our swapped colors (inverse-video will flip)
-                     ;; For done: swap back so colors display correctly without inverse-video
-                     (fg (if is-done
-                             (plist-get color-spec :background)
-                           (plist-get color-spec :foreground)))
-                     (bg (if is-done
-                             (plist-get color-spec :foreground)
-                           (plist-get color-spec :background))))
+              (let*
+                  ((ov (make-overlay todo-start todo-end nil t))
+                   ;; For non-done: use our swapped colors (inverse-video will flip)
+                   ;; For done: swap back so colors display correctly without inverse-video
+                   (fg
+                    (if is-done
+                        (plist-get color-spec :background)
+                      (plist-get color-spec :foreground)))
+                   (bg
+                    (if is-done
+                        (plist-get color-spec :foreground)
+                      (plist-get color-spec :background))))
                 ;; Use a complete face spec that overrides org-mode's TODO faces
-                (overlay-put ov 'face `(:foreground ,fg :background ,bg :weight bold
-                                                    :inherit nil))
+                (overlay-put
+                 ov 'face
+                 `(:foreground
+                   ,fg
+                   :background ,bg
+                   :weight bold
+                   :inherit nil))
                 (overlay-put ov 'priority 1000)
                 (overlay-put ov 'project-to-org-status-color t)
-                (push ov project-to-org--status-color-overlays)))))))))
+                (push
+                 ov project-to-org--status-color-overlays)))))))))
 
 (defun project-to-org--setup-status-colors ()
   "Apply GitHub status colors to Org-mode TODO keywords using overlays."
   (project-to-org--remove-status-color-overlays)
-  (when-let* ((colors-str (project-to-org--get-property "GITHUB_STATUS_COLORS"))
-              (status-colors (project-to-org--parse-status-colors colors-str)))
+  (when-let* ((colors-str
+               (project-to-org--get-property "GITHUB_STATUS_COLORS"))
+              (status-colors
+               (project-to-org--parse-status-colors colors-str)))
     (project-to-org--apply-status-color-overlays status-colors)))
 
 (defun project-to-org--setup-compact-urls ()
@@ -311,18 +375,30 @@ Accounts for org-modern applying `:inverse-video' to non-done states only."
 (define-minor-mode project-to-org-mode
   "Minor mode for enhanced GitHub Project integration in Org-mode."
   :lighter " GH"
-  :group 'project-to-org
+  :group
+  'project-to-org
   (if project-to-org-mode
       (progn
         (project-to-org--setup-status-colors)
         (project-to-org--setup-compact-urls)
         (project-to-org--setup-inline-metadata)
-        (add-hook 'after-save-hook #'project-to-org--setup-compact-urls nil t)
-        (add-hook 'after-save-hook #'project-to-org--setup-inline-metadata nil t)
-        (add-hook 'after-save-hook #'project-to-org--setup-status-colors nil t))
-    (remove-hook 'after-save-hook #'project-to-org--setup-compact-urls t)
-    (remove-hook 'after-save-hook #'project-to-org--setup-inline-metadata t)
-    (remove-hook 'after-save-hook #'project-to-org--setup-status-colors t)
+        (add-hook
+         'after-save-hook #'project-to-org--setup-compact-urls
+         nil t)
+        (add-hook
+         'after-save-hook #'project-to-org--setup-inline-metadata
+         nil t)
+        (add-hook
+         'after-save-hook #'project-to-org--setup-status-colors
+         nil t))
+    (remove-hook 'after-save-hook #'project-to-org--setup-compact-urls
+                 t)
+    (remove-hook
+     'after-save-hook #'project-to-org--setup-inline-metadata
+     t)
+    (remove-hook
+     'after-save-hook #'project-to-org--setup-status-colors
+     t)
     (project-to-org--remove-status-color-overlays)
     (project-to-org--remove-all-metadata-badges)))
 
@@ -332,7 +408,9 @@ Accounts for org-modern applying `:inverse-video' to non-done states only."
     (goto-char (point-min))
 
     (let ((case-fold-search t))
-      (when (re-search-forward (concat "^#\\+" property ":[ \t]*\\(.*\\)$") nil t)
+      (when (re-search-forward (concat
+                                "^#\\+" property ":[ \t]*\\(.*\\)$")
+                               nil t)
         (match-string-no-properties 1)))))
 
 ;;;###autoload
@@ -341,31 +419,41 @@ Accounts for org-modern applying `:inverse-video' to non-done states only."
   "Sync the current Org buffer with the configured GitHub Project.
 Requires #+GITHUB_PROJECT_URL to be set in the file."
   (interactive)
-  (let* ((project-url (project-to-org--get-property "GITHUB_PROJECT_URL"))
+  (let* ((project-url
+          (project-to-org--get-property "GITHUB_PROJECT_URL"))
          (target-file (buffer-file-name))
          (target-buffer (current-buffer))
-         (project-root (file-name-directory (or load-file-name buffer-file-name))))
+         (project-root
+          (file-name-directory (or load-file-name buffer-file-name))))
     (unless project-url
-      (user-error "No #+GITHUB_PROJECT_URL property found in this file"))
+      (user-error
+       "No #+GITHUB_PROJECT_URL property found in this file"))
 
     (unless target-file
       (user-error "Buffer must be saved to a file before syncing"))
 
     (message "Syncing with GitHub Project...")
 
-    (let ((output-buffer (generate-new-buffer "*project-to-org-output*"))
-          (error-buffer (generate-new-buffer "*project-to-org-error*"))
+    (let ((output-buffer
+           (generate-new-buffer "*project-to-org-output*"))
+          (error-buffer
+           (generate-new-buffer "*project-to-org-error*"))
           (default-directory project-root)
-          (args (list project-to-org-script-path
-                      "--project-url" project-url
-                      "--org-file" target-file)))
+          (args
+           (list
+            project-to-org-script-path
+            "--project-url"
+            project-url
+            "--org-file"
+            target-file)))
 
       (set-process-sentinel
        (make-process
         :name "project-to-org"
         :buffer output-buffer
         :stderr error-buffer
-        :command (append (split-string project-to-org-python-command) args))
+        :command
+        (append (split-string project-to-org-python-command) args))
        (lambda (proc _event)
          (when (eq (process-status proc) 'exit)
            (let ((exit-code (process-exit-status proc)))
