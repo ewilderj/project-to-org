@@ -1,6 +1,6 @@
 #+TITLE: ewilderj work
 #+GITHUB_PROJECT_URL: https://github.com/users/ewilderj/projects/1
-#+GITHUB_EXCLUDE_STATUSES: Done
+#+GITHUB_EXCLUDE_STATUSES: DONE
 #+GITHUB_STATUS_MAP: Todo=TODO "In Progress"=STRT "Waiting For"=WAITING_FOR Someday=WAIT Done=DONE
 #+GITHUB_PRIORITY_MAP: High=A Normal=B Low=C
 #+GITHUB_STATUS_COLORS: TODO=YELLOW STRT=PURPLE WAITING_FOR=BLUE WAIT=GRAY DONE=GREEN
@@ -29,5 +29,5 @@ https://github.com/github/tpm/blob/main/role/practices/program-schedule-using-me
 :LABELS: Todo
 :END:
 
-- [X] - Weekly reporting out of date [bug](https://github.com/github/tpm/issues/2415)
+- [X] - Weekly reporting out of date [[https://github.com/github/tpm/issues/2415][bug]]
 - [ ] - Identify backlog of high priority items

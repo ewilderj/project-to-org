@@ -177,17 +177,24 @@ Returns a plist with :issue-number, :assignees, :labels, and :url."
   (when (and project-to-org-inline-metadata
              (re-search-forward org-complex-heading-regexp limit t))
     (let* ((heading-start (match-beginning 0))
-           (headline-end (match-end 4))  ; End of headline text (group 4)
-           (last-char-start (1- headline-end))  ; Start of last char
+           ;; Group 4 is the headline text, but it can be nil
+           ;; Fall back to end of line if no headline text
+           (headline-end (or (match-end 4)
+                             (save-excursion
+                               (goto-char heading-start)
+                               (line-end-position))))
            (metadata (save-excursion
                        (goto-char heading-start)
                        (project-to-org--get-entry-metadata)))
            (badge-text (project-to-org--format-metadata-badges metadata)))
 
-      (when (and badge-text (> headline-end (match-beginning 4)))
+      (when (and badge-text
+                 headline-end
+                 (> headline-end heading-start))
         ;; Create overlay on last character of headline
         ;; Use 'display property to show last char + badge
-        (let* ((last-char (buffer-substring-no-properties last-char-start headline-end))
+        (let* ((last-char-start (1- headline-end))
+               (last-char (buffer-substring-no-properties last-char-start headline-end))
                (ov (make-overlay last-char-start headline-end nil t)))
           (overlay-put ov 'display (concat last-char badge-text))
           (overlay-put ov 'project-to-org-badge t))))
@@ -225,7 +232,7 @@ Returns a plist with :issue-number, :assignees, :labels, and :url."
     ("PURPLE" . (:foreground "#e8d5f9" :background "#6639ba")))
   "Map GitHub project colors to Emacs face specs.
 Each entry is (GITHUB-COLOR . (:foreground FG :background BG)).
-Colors are swapped because org-mode applies inverse-video to TODO keywords.")
+Colors are swapped to account for Org TODO face rendering.")
 
 (defvar-local project-to-org--status-color-overlays nil
   "List of overlays used for status color highlighting.")
@@ -249,21 +256,25 @@ Colors are swapped because org-mode applies inverse-video to TODO keywords.")
   (save-excursion
     (goto-char (point-min))
     (while (re-search-forward org-complex-heading-regexp nil t)
-      (when-let* ((todo-start (match-beginning 2))
-                  (todo-end (match-end 2))
-                  (todo-keyword (match-string 2))
-                  (github-color (cdr (assoc todo-keyword status-colors)))
-                  (color-spec (cdr (assoc github-color
-                                          project-to-org--github-color-map))))
-        (let ((ov (make-overlay todo-start todo-end nil t))
-              (fg (plist-get color-spec :foreground))
-              (bg (plist-get color-spec :background)))
-          ;; Use a complete face spec that overrides org-mode's TODO faces
-          (overlay-put ov 'face `(:foreground ,fg :background ,bg :weight bold
-                                  :inherit nil))
-          (overlay-put ov 'priority 1000)
-          (overlay-put ov 'project-to-org-status-color t)
-          (push ov project-to-org--status-color-overlays))))))
+      ;; Group 2 is the TODO keyword - may be nil if no keyword
+      (let ((todo-start (match-beginning 2))
+            (todo-end (match-end 2)))
+        (when (and todo-start todo-end)
+          (let* ((todo-keyword (match-string 2))
+                 (github-color (cdr (assoc todo-keyword status-colors)))
+                 (color-spec (when github-color
+                               (cdr (assoc github-color
+                                           project-to-org--github-color-map)))))
+            (when color-spec
+              (let ((ov (make-overlay todo-start todo-end nil t))
+                    (fg (plist-get color-spec :foreground))
+                    (bg (plist-get color-spec :background)))
+                ;; Use a complete face spec that overrides org-mode's TODO faces
+                (overlay-put ov 'face `(:foreground ,fg :background ,bg :weight bold
+                                                    :inherit nil))
+                (overlay-put ov 'priority 1000)
+                (overlay-put ov 'project-to-org-status-color t)
+                (push ov project-to-org--status-color-overlays)))))))))
 
 (defun project-to-org--setup-status-colors ()
   "Apply GitHub status colors to Org-mode TODO keywords using overlays."
@@ -352,7 +363,12 @@ Requires #+GITHUB_PROJECT_URL to be set in the file."
                  (progn
                    (with-current-buffer target-buffer
                      (revert-buffer t t t)
+                     ;; Re-parse Org in-buffer settings (#+TODO, etc.)
+                     ;; This ensures org-todo-keywords-1 is updated
+                     (org-set-regexps-and-options)
+                     (font-lock-flush)
                      (when project-to-org-mode
+                       (project-to-org--setup-status-colors)
                        (project-to-org--setup-compact-urls)
                        (project-to-org--setup-inline-metadata))
                      (message "Sync complete!")))

@@ -400,11 +400,16 @@ class OrgConverter:
         fields = self._parse_field_values(item.get("fieldValues", {}).get("nodes", []))
         
         # Determine TODO keyword from Status field
-        status = fields.get("Status", "Todo")
-        todo_keyword = self.status_map.get(status, "TODO")
+        # Use first keyword in status_map as default for items without status
+        status = fields.get("Status")
+        if status and status in self.status_map:
+            todo_keyword = self.status_map[status]
+        else:
+            # Default to first keyword in the map (or "TODO" if map is empty)
+            todo_keyword = next(iter(self.status_map.values()), "TODO") if self.status_map else "TODO"
         
-        # Filter out excluded statuses
-        if status in self.exclude_statuses:
+        # Filter out excluded statuses (accept either GitHub status name or Org keyword)
+        if status in self.exclude_statuses or todo_keyword in self.exclude_statuses:
             return []
         
         # Determine priority cookie if Priority field exists
@@ -455,10 +460,58 @@ class OrgConverter:
         return lines
 
     def _process_body(self, body):
-        """Process the body content to be Org-mode compatible."""
-        # Convert GitHub checkboxes [x] to Org checkboxes [X]
-        # Matches - [x], * [x], + [x] with optional indentation
-        return re.sub(r"^(\s*[-+*]\s+)\[x\]", r"\1[X]", body, flags=re.MULTILINE)
+        """Convert GitHub Markdown body to Org-mode syntax."""
+        text = body
+        
+        # 1. Code blocks (do first to protect content inside)
+        # ```language\ncode\n``` → #+BEGIN_SRC language\ncode\n#+END_SRC
+        text = re.sub(
+            r'```(\w*)\n(.*?)```',
+            lambda m: f'#+BEGIN_SRC {m.group(1)}\n{m.group(2)}#+END_SRC',
+            text,
+            flags=re.DOTALL
+        )
+        
+        # 2. Inline code: `code` → =code=
+        # Be careful not to match inside code blocks (already converted)
+        text = re.sub(r'`([^`\n]+)`', r'=\1=', text)
+        
+        # 3. Images: ![alt](url) → [[url]]
+        text = re.sub(r'!\[([^\]]*)\]\(([^)]+)\)', r'[[\2]]', text)
+        
+        # 4. Links: [text](url) → [[url][text]]
+        text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'[[\2][\1]]', text)
+        
+        # 5. Bold: **text** or __text__ → *text*
+        # Use a placeholder to avoid italic regex matching these
+        text = re.sub(r'\*\*([^*]+)\*\*', r'⟦BOLD⟧\1⟦/BOLD⟧', text)
+        text = re.sub(r'__([^_]+)__', r'⟦BOLD⟧\1⟦/BOLD⟧', text)
+        
+        # 6. Italic: *text* or _text_ → /text/
+        # Must come after bold conversion
+        # Be careful with underscores in words (snake_case)
+        text = re.sub(r'(?<![*⟧])\*([^*]+)\*(?![*⟦])', r'/\1/', text)
+        text = re.sub(r'(?<![a-zA-Z0-9])_([^_]+)_(?![a-zA-Z0-9])', r'/\1/', text)
+        
+        # 7. Replace bold placeholders with Org bold
+        text = text.replace('⟦BOLD⟧', '*').replace('⟦/BOLD⟧', '*')
+        
+        # 8. Strikethrough: ~~text~~ → +text+
+        text = re.sub(r'~~([^~]+)~~', r'+\1+', text)
+        
+        # 9. Blockquotes: > text → : text (Org fixed-width/quote style)
+        text = re.sub(r'^>\s*(.*)$', r': \1', text, flags=re.MULTILINE)
+        
+        # 10. Checkboxes: - [x] → - [X] (uppercase for Org)
+        text = re.sub(r'^(\s*[-+*]\s+)\[x\]', r'\1[X]', text, flags=re.MULTILINE)
+        
+        # 11. Horizontal rules: --- or *** or ___ → -----
+        text = re.sub(r'^(---+|\*\*\*+|___+)\s*$', r'-----', text, flags=re.MULTILINE)
+        
+        # 12. Headers: # H1, ## H2 → not converted (would conflict with org headings)
+        # Leave as-is or could prefix with "* " but that creates sub-headings
+        
+        return text
 
     def _parse_field_values(self, nodes):
         """Extract field names and values from the nested GraphQL structure."""

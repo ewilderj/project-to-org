@@ -158,6 +158,100 @@ def test_exclude_statuses_persistence():
     output = converter.convert()
     assert "#+GITHUB_EXCLUDE_STATUSES" not in output
 
+
+def test_exclude_statuses_by_org_keyword():
+    """Test that items can be excluded by Org keyword (not just GitHub status name)."""
+    mock_data = {
+        "title": "Test Project",
+        "items": {
+            "nodes": [
+                {
+                    "id": "1",
+                    "type": "DRAFT_ISSUE",
+                    "content": {"title": "Keep Me"},
+                    "fieldValues": {
+                        "nodes": [{"name": "Todo", "field": {"name": "Status"}}]
+                    }
+                },
+                {
+                    "id": "2",
+                    "type": "DRAFT_ISSUE",
+                    "content": {"title": "Exclude Me"},
+                    "fieldValues": {
+                        "nodes": [{"name": "Done", "field": {"name": "Status"}}]
+                    }
+                }
+            ]
+        },
+        "fields": {
+            "nodes": [
+                {
+                    "name": "Status",
+                    "options": [
+                        {"name": "Todo"},
+                        {"name": "Done"}
+                    ]
+                }
+            ]
+        }
+    }
+    
+    # Exclude by Org keyword "DONE" instead of GitHub status "Done"
+    converter = OrgConverter(mock_data, exclude_statuses=["DONE"])
+    org_output = converter.convert()
+    
+    assert "* TODO Keep Me" in org_output
+    assert "Exclude Me" not in org_output
+
+
+def test_missing_status_uses_first_keyword():
+    """Test that items without a status use the first keyword in the map."""
+    mock_data = {
+        "title": "Test Project",
+        "items": {
+            "nodes": [
+                {
+                    "id": "1",
+                    "type": "DRAFT_ISSUE",
+                    "content": {"title": "No Status Item"},
+                    "fieldValues": {
+                        "nodes": []  # No status field
+                    }
+                },
+                {
+                    "id": "2",
+                    "type": "DRAFT_ISSUE",
+                    "content": {"title": "Unknown Status Item"},
+                    "fieldValues": {
+                        "nodes": [{"name": "SomeUnknownStatus", "field": {"name": "Status"}}]
+                    }
+                }
+            ]
+        },
+        "fields": {
+            "nodes": [
+                {
+                    "name": "Status",
+                    "options": [
+                        {"name": "Backlog"},
+                        {"name": "Ready"},
+                        {"name": "Done"}
+                    ]
+                }
+            ]
+        }
+    }
+    
+    converter = OrgConverter(mock_data)
+    org_output = converter.convert()
+    
+    # Both items should use the first keyword (WAIT from Backlog) not hardcoded TODO
+    # The auto-mapping generates Backlog=WAIT, Ready=READY, Done=DONE
+    assert "* WAIT No Status Item" in org_output
+    assert "* WAIT Unknown Status Item" in org_output
+    assert "* TODO" not in org_output
+
+
 def test_custom_status_map():
     """Test that custom status mapping works."""
     mock_data = {
@@ -595,3 +689,213 @@ def test_no_status_colors_when_missing():
     output = converter.convert()
     
     assert "#+GITHUB_STATUS_COLORS:" not in output
+
+
+# --- Markdown to Org Conversion Tests ---
+
+def test_markdown_links_to_org():
+    """Test that Markdown links are converted to Org links."""
+    project_data = {
+        "title": "Test",
+        "items": {"nodes": [{
+            "id": "1",
+            "type": "ISSUE",
+            "content": {
+                "title": "Test",
+                "body": "Check out [this link](https://example.com) for details.",
+                "number": 1,
+                "url": "http://example.com",
+                "assignees": {"nodes": []},
+                "labels": {"nodes": []}
+            },
+            "fieldValues": {"nodes": [{"name": "Todo", "field": {"name": "Status"}}]}
+        }]},
+        "fields": {"nodes": [{"name": "Status", "options": [{"name": "Todo"}]}]}
+    }
+    
+    converter = OrgConverter(project_data)
+    output = converter.convert()
+    
+    assert "[[https://example.com][this link]]" in output
+    assert "[this link](https://example.com)" not in output
+
+
+def test_markdown_bold_italic_to_org():
+    """Test bold and italic conversion."""
+    project_data = {
+        "title": "Test",
+        "items": {"nodes": [{
+            "id": "1",
+            "type": "ISSUE",
+            "content": {
+                "title": "Test",
+                "body": "This is **bold** and *italic* and __also bold__ and _also italic_.",
+                "number": 1,
+                "url": "http://example.com",
+                "assignees": {"nodes": []},
+                "labels": {"nodes": []}
+            },
+            "fieldValues": {"nodes": [{"name": "Todo", "field": {"name": "Status"}}]}
+        }]},
+        "fields": {"nodes": [{"name": "Status", "options": [{"name": "Todo"}]}]}
+    }
+    
+    converter = OrgConverter(project_data)
+    output = converter.convert()
+    
+    # Bold: **text** → *text*
+    assert "*bold*" in output
+    assert "**bold**" not in output
+    
+    # Italic: *text* → /text/
+    assert "/italic/" in output
+    
+    # __text__ → *text*
+    assert "*also bold*" in output
+    
+    # _text_ → /text/
+    assert "/also italic/" in output
+
+
+def test_markdown_code_to_org():
+    """Test inline code and code blocks."""
+    project_data = {
+        "title": "Test",
+        "items": {"nodes": [{
+            "id": "1",
+            "type": "ISSUE",
+            "content": {
+                "title": "Test",
+                "body": "Use `print()` function.\n\n```python\ndef hello():\n    print('hi')\n```",
+                "number": 1,
+                "url": "http://example.com",
+                "assignees": {"nodes": []},
+                "labels": {"nodes": []}
+            },
+            "fieldValues": {"nodes": [{"name": "Todo", "field": {"name": "Status"}}]}
+        }]},
+        "fields": {"nodes": [{"name": "Status", "options": [{"name": "Todo"}]}]}
+    }
+    
+    converter = OrgConverter(project_data)
+    output = converter.convert()
+    
+    # Inline code: `code` → =code=
+    assert "=print()=" in output
+    assert "`print()`" not in output
+    
+    # Code block: ```python → #+BEGIN_SRC python
+    assert "#+BEGIN_SRC python" in output
+    assert "#+END_SRC" in output
+    assert "```python" not in output
+
+
+def test_markdown_strikethrough_to_org():
+    """Test strikethrough conversion."""
+    project_data = {
+        "title": "Test",
+        "items": {"nodes": [{
+            "id": "1",
+            "type": "ISSUE",
+            "content": {
+                "title": "Test",
+                "body": "This is ~~deleted~~ text.",
+                "number": 1,
+                "url": "http://example.com",
+                "assignees": {"nodes": []},
+                "labels": {"nodes": []}
+            },
+            "fieldValues": {"nodes": [{"name": "Todo", "field": {"name": "Status"}}]}
+        }]},
+        "fields": {"nodes": [{"name": "Status", "options": [{"name": "Todo"}]}]}
+    }
+    
+    converter = OrgConverter(project_data)
+    output = converter.convert()
+    
+    assert "+deleted+" in output
+    assert "~~deleted~~" not in output
+
+
+def test_markdown_blockquote_to_org():
+    """Test blockquote conversion."""
+    project_data = {
+        "title": "Test",
+        "items": {"nodes": [{
+            "id": "1",
+            "type": "ISSUE",
+            "content": {
+                "title": "Test",
+                "body": "Someone said:\n> This is a quote\n> with multiple lines",
+                "number": 1,
+                "url": "http://example.com",
+                "assignees": {"nodes": []},
+                "labels": {"nodes": []}
+            },
+            "fieldValues": {"nodes": [{"name": "Todo", "field": {"name": "Status"}}]}
+        }]},
+        "fields": {"nodes": [{"name": "Status", "options": [{"name": "Todo"}]}]}
+    }
+    
+    converter = OrgConverter(project_data)
+    output = converter.convert()
+    
+    assert ": This is a quote" in output
+    assert ": with multiple lines" in output
+    assert "> This is a quote" not in output
+
+
+def test_markdown_image_to_org():
+    """Test image link conversion."""
+    project_data = {
+        "title": "Test",
+        "items": {"nodes": [{
+            "id": "1",
+            "type": "ISSUE",
+            "content": {
+                "title": "Test",
+                "body": "See this screenshot:\n![screenshot](https://example.com/img.png)",
+                "number": 1,
+                "url": "http://example.com",
+                "assignees": {"nodes": []},
+                "labels": {"nodes": []}
+            },
+            "fieldValues": {"nodes": [{"name": "Todo", "field": {"name": "Status"}}]}
+        }]},
+        "fields": {"nodes": [{"name": "Status", "options": [{"name": "Todo"}]}]}
+    }
+    
+    converter = OrgConverter(project_data)
+    output = converter.convert()
+    
+    # Images become plain links in Org
+    assert "[[https://example.com/img.png]]" in output
+    assert "![screenshot]" not in output
+
+
+def test_markdown_checkbox_to_org():
+    """Test checkbox conversion (uppercase X)."""
+    project_data = {
+        "title": "Test",
+        "items": {"nodes": [{
+            "id": "1",
+            "type": "ISSUE",
+            "content": {
+                "title": "Test",
+                "body": "- [x] Done task\n- [ ] Pending task",
+                "number": 1,
+                "url": "http://example.com",
+                "assignees": {"nodes": []},
+                "labels": {"nodes": []}
+            },
+            "fieldValues": {"nodes": [{"name": "Todo", "field": {"name": "Status"}}]}
+        }]},
+        "fields": {"nodes": [{"name": "Status", "options": [{"name": "Todo"}]}]}
+    }
+    
+    converter = OrgConverter(project_data)
+    output = converter.convert()
+    
+    assert "- [X] Done task" in output
+    assert "- [ ] Pending task" in output
+    assert "- [x]" not in output
