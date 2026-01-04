@@ -2,7 +2,7 @@
 
 ;; Copyright (C) 2026  Edd Wilder-James
 
-;; Author: Edd Wilder-James <edd@example.com>
+;; Author: Edd Wilder-James <edd@me.com>
 ;; URL: https://github.com/ewilderj/project-to-org
 ;; Version: 0.1.0
 ;; Keywords: tools, org, github
@@ -252,7 +252,8 @@ Colors are swapped to account for Org TODO face rendering.")
   (setq project-to-org--status-color-overlays nil))
 
 (defun project-to-org--apply-status-color-overlays (status-colors)
-  "Apply overlays for TODO keywords based on STATUS-COLORS alist."
+  "Apply overlays for TODO keywords based on STATUS-COLORS alist.
+Accounts for org-modern applying `:inverse-video' to non-done states only."
   (save-excursion
     (goto-char (point-min))
     (while (re-search-forward org-complex-heading-regexp nil t)
@@ -264,11 +265,20 @@ Colors are swapped to account for Org TODO face rendering.")
                  (github-color (cdr (assoc todo-keyword status-colors)))
                  (color-spec (when github-color
                                (cdr (assoc github-color
-                                           project-to-org--github-color-map)))))
+                                           project-to-org--github-color-map))))
+                 ;; org-modern applies :inverse-video to non-done states only
+                 ;; so we need different color ordering for done states
+                 (is-done (member todo-keyword org-done-keywords)))
             (when color-spec
-              (let ((ov (make-overlay todo-start todo-end nil t))
-                    (fg (plist-get color-spec :foreground))
-                    (bg (plist-get color-spec :background)))
+              (let* ((ov (make-overlay todo-start todo-end nil t))
+                     ;; For non-done: use our swapped colors (inverse-video will flip)
+                     ;; For done: swap back so colors display correctly without inverse-video
+                     (fg (if is-done
+                             (plist-get color-spec :background)
+                           (plist-get color-spec :foreground)))
+                     (bg (if is-done
+                             (plist-get color-spec :foreground)
+                           (plist-get color-spec :background))))
                 ;; Use a complete face spec that overrides org-mode's TODO faces
                 (overlay-put ov 'face `(:foreground ,fg :background ,bg :weight bold
                                                     :inherit nil))
