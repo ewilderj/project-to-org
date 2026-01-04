@@ -57,17 +57,21 @@ Defaults to \='uv run\=' which handles dependencies automatically."
   :group 'project-to-org)
 
 (defface project-to-org-issue-badge
-  '((t :inherit font-lock-constant-face :weight bold :underline t))
+  '((t
+     :inherit font-lock-constant-face
+     :weight bold
+     :underline t
+     :height 1.0))
   "Face for issue number badges."
   :group 'project-to-org)
 
 (defface project-to-org-assignee-badge
-  '((t :inherit font-lock-variable-name-face))
+  '((t :inherit font-lock-variable-name-face :height 1.0))
   "Face for assignee badges."
   :group 'project-to-org)
 
 (defface project-to-org-label-badge
-  '((t :inherit font-lock-string-face :foreground "cyan"))
+  '((t :inherit font-lock-string-face :foreground "cyan" :height 1.0))
   "Face for label badges."
   :group 'project-to-org)
 
@@ -359,14 +363,12 @@ Accounts for org-modern applying `:inverse-video' to non-done states only."
 
 (defun project-to-org--setup-compact-urls ()
   "Set up compact URL display for the current buffer."
-  (when (and (derived-mode-p 'org-mode)
-             (project-to-org--get-property "GITHUB_PROJECT_URL"))
+  (when (project-to-org--get-property "GITHUB_PROJECT_URL")
     (project-to-org--compact-urls-in-buffer)))
 
 (defun project-to-org--setup-inline-metadata ()
   "Set up inline metadata display for the current buffer."
-  (when (and (derived-mode-p 'org-mode)
-             (project-to-org--get-property "GITHUB_PROJECT_URL"))
+  (when (project-to-org--get-property "GITHUB_PROJECT_URL")
     (project-to-org--remove-all-metadata-badges)
     (project-to-org--add-all-metadata-badges)
     (project-to-org--fold-all-properties)))
@@ -378,7 +380,11 @@ Accounts for org-modern applying `:inverse-video' to non-done states only."
   :group
   'project-to-org
   (if project-to-org-mode
-      (progn
+      (if (not (derived-mode-p 'org-mode))
+          (progn
+            (setq project-to-org-mode nil)
+            (user-error
+             "`project-to-org-mode' should be enabled only in `org-mode'"))
         (project-to-org--setup-status-colors)
         (project-to-org--setup-compact-urls)
         (project-to-org--setup-inline-metadata)
