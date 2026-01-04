@@ -11,3 +11,4 @@ test3.org
 # Eask (Elisp build tool)
 .eask/
 *.elc
+test.org
