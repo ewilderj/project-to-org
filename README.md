@@ -1,60 +1,194 @@
 # project-to-org
 
-A tool to sync GitHub Projects to an Org-mode file.
+View your GitHub Projects as Org-mode files with rich visual enhancements.
+
+> ⚠️ **Note**: This is currently a **one-way sync** (GitHub → Org). Changes made in your Org file will be overwritten on the next sync. Use this tool for viewing and organizing your GitHub Projects in Emacs, not for editing them.
+
+## What it Does
+
+project-to-org fetches issues and draft issues from a GitHub Project V2 and converts them to an Org-mode file. The accompanying Emacs minor mode adds visual enhancements like status colors, compact URLs, and inline metadata badges.
+
+![Screenshot placeholder](screenshot.png)
 
 ## Features
 
-*   **One-way Sync**: Fetches Issues and Draft Issues from a GitHub Project V2 and converts them to Org-mode headings.
-*   **Status Mapping**: Maps project status (Todo, In Progress, Done) to Org TODO keywords.
-*   **Properties**: Syncs all custom fields (Priority, Dates, Iteration, etc.) to the `:PROPERTIES:` drawer.
-*   **Emacs Integration**: Provides an interactive command `project-to-org-sync` to sync directly from Emacs.
+### Data Sync
+- **Issues & Draft Issues**: All items from your GitHub Project become Org headings
+- **Status → TODO**: Project status maps to Org TODO keywords (e.g., "In Progress" → `STRT`)
+- **Custom Fields**: Priority, dates, iteration, and other fields sync to `:PROPERTIES:` drawers
+- **Assignees & Labels**: Stored as properties and displayed as inline badges
+
+### Visual Enhancements (Emacs)
+- **Status Colors**: TODO keywords are colored to match GitHub's status colors (GRAY, BLUE, GREEN, etc.)
+- **Compact URLs**: Long GitHub URLs display as `owner/repo#123` (click to open, middle-click to copy)
+- **Inline Badges**: Issue numbers, assignees, and labels appear as badges on each heading
+- **Auto-fold Properties**: Properties drawers are automatically folded for cleaner viewing
+
+## Requirements
+
+- **Python 3.10+** with [uv](https://github.com/astral-sh/uv) for dependency management
+- **GitHub CLI** (`gh`) authenticated with access to your project
+- **Emacs 29.1+** for the visual enhancements (optional but recommended)
 
 ## Installation
 
-### Python Dependencies
-
-This project uses `uv` for dependency management.
+### Step 1: Clone the Repository
 
 ```bash
-# Install dependencies
+git clone https://github.com/ewilderj/project-to-org.git
+cd project-to-org
+```
+
+### Step 2: Install Python Dependencies
+
+```bash
 uv sync
 ```
 
-### Emacs Setup
+### Step 3: Set Up Emacs (Optional)
 
-Add the following to your Emacs configuration:
+Choose one of these methods:
+
+#### Using use-package with `:vc` (Emacs 29+)
+
+```elisp
+(use-package project-to-org
+  :vc (:url "https://github.com/ewilderj/project-to-org"
+       :rev :newest)
+  :commands (project-to-org-sync project-to-org-mode)
+  :custom
+  (project-to-org-python-command "uv run"))
+```
+
+#### Using straight.el
+
+```elisp
+(use-package project-to-org
+  :straight (:host github :repo "ewilderj/project-to-org")
+  :commands (project-to-org-sync project-to-org-mode)
+  :custom
+  (project-to-org-python-command "uv run"))
+```
+
+#### Using quelpa
+
+```elisp
+(use-package project-to-org
+  :quelpa (project-to-org :fetcher github :repo "ewilderj/project-to-org")
+  :commands (project-to-org-sync project-to-org-mode)
+  :custom
+  (project-to-org-python-command "uv run"))
+```
+
+#### Manual Installation
 
 ```elisp
 (add-to-list 'load-path "/path/to/project-to-org")
 (require 'project-to-org)
+(setq project-to-org-python-command "uv run")
 ```
 
-## Usage
+## Quick Start
 
-### 1. Prepare your Org file
-
-Create an Org file and add the `#+GITHUB_PROJECT_URL` property at the top:
+### 1. Create an Org file with the project URL
 
 ```org
-#+GITHUB_PROJECT_URL: https://github.com/users/YOUR_USERNAME/projects/YOUR_PROJECT_NUMBER
+#+GITHUB_PROJECT_URL: https://github.com/users/YOUR_USERNAME/projects/1
 ```
 
-### 2. Run the Sync
+You can find your project URL by opening your GitHub Project in a browser and copying the URL.
 
-**From Emacs:**
+### 2. Sync from Emacs
 
-Run `M-x project-to-org-sync`.
+Open the Org file and run:
 
-**From Command Line:**
+```
+M-x project-to-org-sync
+```
+
+The file will be populated with your project's issues. The minor mode (`project-to-org-mode`) enables automatically via file-local variables added by the sync.
+
+### Alternative: Sync from Command Line
 
 ```bash
-uv run src/project_to_org/main.py --project-url https://github.com/users/ewilderj/projects/1 --org-file my-project.org
+uv run src/project_to_org/main.py \
+  --project-url https://github.com/users/YOUR_USERNAME/projects/1 \
+  --org-file my-project.org
 ```
 
 ## Configuration
 
-You can customize the Python command in Emacs:
+### Emacs Customization
 
-```elisp
-(setq project-to-org-python-command "uv run")
+All settings are in the `project-to-org` customization group (`M-x customize-group RET project-to-org`).
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `project-to-org-python-command` | `"uv run"` | Command to run Python scripts |
+| `project-to-org-compact-urls` | `t` | Show URLs as `owner/repo#123` |
+| `project-to-org-inline-metadata` | `t` | Show badges on headings |
+| `project-to-org-fold-properties` | `t` | Auto-fold properties drawers |
+| `project-to-org-issue-prefix` | `"#"` | Prefix for issue badges |
+| `project-to-org-assignee-prefix` | `"👤 "` | Prefix for assignee badges |
+| `project-to-org-label-prefix` | `"🏷️ "` | Prefix for label badges |
+
+### CLI Options
+
 ```
+--project-url URL          GitHub Project URL (required)
+--org-file FILE            Output file path
+--exclude-statuses STATUS  Exclude items with these statuses
+--status-map MAP           Custom status→TODO mapping (e.g., 'Todo=TODO "In Progress"=STRT')
+--priority-map MAP         Custom priority→Org mapping (e.g., 'Low=C Medium=B High=A')
+--no-local-variables       Don't add Local Variables block (disables auto-enabling the mode)
+```
+
+### Custom Status Mapping
+
+By default, statuses map to: `Todo` → `TODO`, `In Progress` → `STRT`, `Done` → `DONE`.
+
+To customize:
+
+```bash
+uv run src/project_to_org/main.py \
+  --project-url ... \
+  --status-map 'Backlog=WAIT Todo=TODO "In Progress"=STRT Done=DONE'
+```
+
+### Priority Mapping
+
+GitHub Project priorities are mapped to Org priority cookies (`[#A]`, `[#B]`, etc.). The tool auto-detects common schemes:
+
+| GitHub Priority | Org Priority |
+|-----------------|-------------|
+| `P0` | `[#A]` |
+| `P1` | `[#B]` |
+| `P2` | `[#C]` |
+| `High` / `Critical` / `Urgent` | `[#A]` |
+| `Medium` / `Normal` | `[#B]` |
+| `Low` | `[#C]` |
+
+For custom priority fields, use `--priority-map`:
+
+```bash
+uv run src/project_to_org/main.py \
+  --project-url ... \
+  --priority-map 'Critical=A Important=B Normal=C'
+
+## How It Works
+
+1. The Python script queries GitHub's GraphQL API via the `gh` CLI
+2. Issues and draft issues are converted to Org headings with properties
+3. Status colors are stored in `#+GITHUB_STATUS_COLORS` for the Emacs mode
+4. The Emacs mode applies overlays for colors, compact URLs, and badges
+5. Overlays refresh automatically when the file is saved
+
+## Limitations
+
+- **One-way sync only**: GitHub → Org. Local changes will be lost on re-sync.
+- **No write-back**: Editing TODO states in Org does not update GitHub.
+- **100 item limit**: Currently fetches the first 100 items from a project (pagination not yet implemented).
+
+## License
+
+MIT
