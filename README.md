@@ -8,7 +8,7 @@ View your GitHub Projects as Org-mode files with rich visual enhancements.
 
 project-to-org fetches issues and draft issues from a GitHub Project V2 and converts them to an Org-mode file. The accompanying Emacs minor mode adds visual enhancements like status colors, compact URLs, and inline metadata badges.
 
-![Screenshot](screenshot.png)
+![Screenshot](docs/screenshot.png)
 
 (Screenshot notes: theme Dracula, with additional modes `mixed-pitch-mode`, `org-modern` and `org-tidy`)
 
