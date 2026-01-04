@@ -518,6 +518,9 @@ class OrgConverter:
         # 13. Headers: # H1, ## H2 → not converted (would conflict with org headings)
         # Leave as-is or could prefix with "* " but that creates sub-headings
         
+        # 14. Trim trailing whitespace from each line
+        text = '\n'.join(line.rstrip() for line in text.split('\n'))
+        
         return text
 
     def _parse_field_values(self, nodes):
