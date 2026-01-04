@@ -118,17 +118,23 @@ name = "project-to-org"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "pytest" },
     { name = "python-dotenv" },
     { name = "requests" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "pytest" },
+]
+
 [package.metadata]
 requires-dist = [
-    { name = "pytest", specifier = ">=7.0.0" },
     { name = "python-dotenv", specifier = ">=1.0.0" },
     { name = "requests", specifier = ">=2.31.0" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=7.0.0" }]
 
 [[package]]
 name = "pygments"
