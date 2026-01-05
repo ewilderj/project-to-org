@@ -33,8 +33,9 @@ Defaults to \='uv run\=' which handles dependencies automatically."
 If a relative path (like the default), searches for it in:
 1. Same directory as this elisp file
 2. Resolved symlink location (for straight.el)
-3. straight.el repos directory
-4. quelpa packages directory
+3. straight.el repos directory (vanilla Emacs)
+4. straight.el repos directory (Doom Emacs .local)
+5. quelpa packages directory
 
 If an absolute path, uses it directly."
   :type 'file
@@ -57,9 +58,14 @@ Returns the first existing path, or nil if not found."
             ;; True location after resolving symlinks
             (and true-elisp-dir
                  (expand-file-name script-name true-elisp-dir))
-            ;; straight.el repos
+            ;; straight.el repos (vanilla)
             (expand-file-name (concat
                                "straight/repos/project-to-org/"
+                               script-name)
+                              user-emacs-directory)
+            ;; straight.el repos (Doom Emacs)
+            (expand-file-name (concat
+                               "../straight/repos/project-to-org/"
                                script-name)
                               user-emacs-directory)
             ;; quelpa packages

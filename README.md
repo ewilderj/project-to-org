@@ -28,7 +28,7 @@ project-to-org fetches issues and draft issues from a GitHub Project V2 and conv
 
 ## Requirements
 
-- **Python 3.10+** with [uv](https://github.com/astral-sh/uv) for dependency management
+- **[uv](https://github.com/astral-sh/uv)** for Python dependency management
 - **GitHub CLI** (`gh`) authenticated with access to your project
 - **Emacs 29.1+** for the visual enhancements (optional but recommended)
 
@@ -46,6 +46,24 @@ The Emacs package handles everything—it downloads the Python script and runs s
        :rev :newest)
   :commands (project-to-org-sync project-to-org-mode))
 ```
+
+#### Using Doom Emacs
+
+Add to your `packages.el`:
+
+```elisp
+(package! project-to-org
+  :recipe (:host github :repo "ewilderj/project-to-org"))
+```
+
+And in your `config.el`:
+
+```elisp
+(use-package! project-to-org
+  :commands (project-to-org-sync project-to-org-mode))
+```
+
+Then run `doom sync` to install.
 
 #### Using straight.el
 
