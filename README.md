@@ -51,9 +51,7 @@ Choose one of these methods:
 (use-package project-to-org
   :vc (:url "https://github.com/ewilderj/project-to-org"
        :rev :newest)
-  :commands (project-to-org-sync project-to-org-mode)
-  :custom
-  (project-to-org-python-command "uv run"))
+  :commands (project-to-org-sync project-to-org-mode))
 ```
 
 #### Using straight.el
@@ -61,9 +59,7 @@ Choose one of these methods:
 ```elisp
 (use-package project-to-org
   :straight (:host github :repo "ewilderj/project-to-org")
-  :commands (project-to-org-sync project-to-org-mode)
-  :custom
-  (project-to-org-python-command "uv run"))
+  :commands (project-to-org-sync project-to-org-mode))
 ```
 
 #### Using quelpa
@@ -71,9 +67,7 @@ Choose one of these methods:
 ```elisp
 (use-package project-to-org
   :quelpa (project-to-org :fetcher github :repo "ewilderj/project-to-org")
-  :commands (project-to-org-sync project-to-org-mode)
-  :custom
-  (project-to-org-python-command "uv run"))
+  :commands (project-to-org-sync project-to-org-mode))
 ```
 
 #### Manual Installation
@@ -81,7 +75,6 @@ Choose one of these methods:
 ```elisp
 (add-to-list 'load-path "/path/to/project-to-org")
 (require 'project-to-org)
-(setq project-to-org-python-command "uv run")
 ```
 
 ## Quick Start
@@ -129,9 +122,23 @@ All settings are in the `project-to-org` customization group (`M-x customize-gro
 | `project-to-org-assignee-prefix` | `"👤 "` | Prefix for assignee badges |
 | `project-to-org-label-prefix` | `"🏷️ "` | Prefix for label badges |
 
-If `project-to-org-script-path` is a relative path (the default), it searches standard locations (package directory, straight.el repos, quelpa packages). If set to an absolute path, it uses that directly. Prefix for issue badges |
-| `project-to-org-assignee-prefix` | `"👤 "` | Prefix for assignee badges |
-| `project-to-org-label-prefix` | `"🏷️ "` | Prefix for label badges |
+### Customizing Status and Priority Mapping
+
+After the first sync, the Org file contains headers that control how GitHub fields map to Org. You can edit these directly:
+
+```org
+#+GITHUB_STATUS_MAP: Todo=TODO "In Progress"=STRT Done=DONE
+#+GITHUB_PRIORITY_MAP: Low=C Medium=B High=A
+#+GITHUB_EXCLUDE_STATUSES: Done
+```
+
+- **Status Map**: Maps GitHub status names to Org TODO keywords. Quote names with spaces.
+- **Priority Map**: Maps GitHub priority values to Org priority cookies (`[#A]`, `[#B]`, etc.).
+- **Exclude Statuses**: Space-separated list of statuses to omit from the Org file.
+
+Your customizations are preserved on re-sync. The tool auto-detects common priority schemes (P0/P1/P2, High/Medium/Low) so you often won't need to configure anything.
+
+The same mappings can be set via CLI options (`--status-map`, `--priority-map`, `--exclude-statuses`) for initial setup.
 
 ### CLI Options
 
@@ -139,42 +146,7 @@ If `project-to-org-script-path` is a relative path (the default), it searches st
 --project-url URL          GitHub Project URL (required)
 --org-file FILE            Output file path
 --exclude-statuses STATUS  Exclude items with these statuses
---status-map MAP           Custom status→TODO mapping (e.g., 'Todo=TODO "In Progress"=STRT')
---priority-map MAP         Custom priority→Org mapping (e.g., 'Low=C Medium=B High=A')
---no-local-variables       Don't add Local Variables block (disables auto-enabling the mode)
-```
-
-### Custom Status Mapping
-
-By default, statuses map to: `Todo` → `TODO`, `In Progress` → `STRT`, `Done` → `DONE`.
-
-To customize:
-
-```bash
-uv run project_to_org.py \
-  --project-url ... \
-  --status-map 'Backlog=WAIT Todo=TODO "In Progress"=STRT Done=DONE'
-```
-
-### Priority Mapping
-
-GitHub Project priorities are mapped to Org priority cookies (`[#A]`, `[#B]`, etc.). The tool auto-detects common schemes:
-
-| GitHub Priority | Org Priority |
-|-----------------|-------------|
-| `P0` | `[#A]` |
-| `P1` | `[#B]` |
-| `P2` | `[#C]` |
-| `High` / `Critical` / `Urgent` | `[#A]` |
-| `Medium` / `Normal` | `[#B]` |
-| `Low` | `[#C]` |
-
-For custom priority fields, use `--priority-map`:
-
-```bash
-uv run project_to_org.py \
-  --project-url ... \
-  --priority-map 'Critical=A Important=B Normal=C'
+--no-local-variables       Don't add Local Variables block
 ```
 
 ## How It Works
