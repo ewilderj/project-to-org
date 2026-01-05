@@ -1,6 +1,6 @@
-#!/usr/bin/env python3
+#!/usr/bin/env uv run --script
 # /// script
-# requires-python = ">=3.10"
+# requires-python = ">=3.13, < 4.0"
 # dependencies = [
 #     "requests>=2.31.0",
 # ]
