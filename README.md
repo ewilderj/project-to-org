@@ -136,15 +136,6 @@ Your customizations are preserved on re-sync. The tool auto-detects common prior
 
 The same mappings can be set via CLI options (`--status-map`, `--priority-map`, `--exclude-statuses`) for initial setup.
 
-### CLI Options
-
-```
---project-url URL          GitHub Project URL (required)
---org-file FILE            Output file path
---exclude-statuses STATUS  Exclude items with these statuses
---no-local-variables       Don't add Local Variables block
-```
-
 ## How It Works
 
 1. The standalone Python script (`project_to_org.py`) has inline dependencies and runs via `uv run`
