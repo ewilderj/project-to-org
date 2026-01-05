@@ -70,7 +70,7 @@ If you just want the Python script without Emacs integration:
 ```bash
 git clone https://github.com/ewilderj/project-to-org.git
 cd project-to-org
-uv run project_to_org.py --help
+./project_to_org.py --help
 ```
 
 ## Quick Start
@@ -96,7 +96,7 @@ The file will be populated with your project's issues. The minor mode (`project-
 ### Alternative: Sync from Command Line
 
 ```bash
-uv run project_to_org.py \
+./project_to_org.py \
   --project-url https://github.com/users/YOUR_USERNAME/projects/1 \
   --org-file my-project.org
 ```
