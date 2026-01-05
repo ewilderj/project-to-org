@@ -34,16 +34,9 @@ project-to-org fetches issues and draft issues from a GitHub Project V2 and conv
 
 ## Installation
 
-### Step 1: Clone the Repository
+### Emacs (Recommended)
 
-```bash
-git clone https://github.com/ewilderj/project-to-org.git
-cd project-to-org
-```
-
-### Step 2: Set Up Emacs (Optional)
-
-Choose one of these methods:
+The Emacs package handles everything—it downloads the Python script and runs syncs for you.
 
 #### Using use-package with `:vc` (Emacs 29+)
 
@@ -70,11 +63,14 @@ Choose one of these methods:
   :commands (project-to-org-sync project-to-org-mode))
 ```
 
-#### Manual Installation
+### CLI Only
 
-```elisp
-(add-to-list 'load-path "/path/to/project-to-org")
-(require 'project-to-org)
+If you just want the Python script without Emacs integration:
+
+```bash
+git clone https://github.com/ewilderj/project-to-org.git
+cd project-to-org
+uv run project_to_org.py --help
 ```
 
 ## Quick Start
