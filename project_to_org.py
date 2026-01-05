@@ -68,7 +68,7 @@ def parse_project_url(url):
 
 
 def fetch_project_items(owner_type, owner, number, token):
-    """Fetch items from a GitHub Project V2."""
+    """Fetch items from a GitHub Project V2 with pagination."""
     url = "https://api.github.com/graphql"
     headers = {"Authorization": f"Bearer {token}"}
 
@@ -78,7 +78,8 @@ def fetch_project_items(owner_type, owner, number, token):
     else:
         owner_query_part = f'organization(login: "{owner}")'
 
-    query = f"""
+    # First, fetch project metadata (title, fields) without items
+    metadata_query = f"""
     query {{
       {owner_query_part} {{
         projectV2(number: {number}) {{
@@ -98,77 +99,12 @@ def fetch_project_items(owner_type, owner, number, token):
               }}
             }}
           }}
-          items(first: 100) {{
-            nodes {{
-              id
-              type
-              content {{
-                ... on Issue {{
-                  title
-                  body
-                  state
-                  number
-                  url
-                  assignees(first: 10) {{
-                    nodes {{
-                      login
-                    }}
-                  }}
-                  labels(first: 10) {{
-                    nodes {{
-                      name
-                    }}
-                  }}
-                }}
-                ... on DraftIssue {{
-                  title
-                  body
-                }}
-              }}
-              fieldValues(first: 20) {{
-                nodes {{
-                  ... on ProjectV2ItemFieldSingleSelectValue {{
-                    name
-                    field {{
-                      ... on ProjectV2FieldCommon {{
-                        name
-                      }}
-                    }}
-                  }}
-                  ... on ProjectV2ItemFieldTextValue {{
-                    text
-                    field {{
-                      ... on ProjectV2FieldCommon {{
-                        name
-                      }}
-                    }}
-                  }}
-                  ... on ProjectV2ItemFieldDateValue {{
-                    date
-                    field {{
-                      ... on ProjectV2FieldCommon {{
-                        name
-                      }}
-                    }}
-                  }}
-                  ... on ProjectV2ItemFieldIterationValue {{
-                    title
-                    field {{
-                      ... on ProjectV2FieldCommon {{
-                        name
-                      }}
-                    }}
-                  }}
-                }}
-              }}
-            }}
-          }}
         }}
       }}
     }}
     """
 
-    response = requests.post(url, json={"query": query}, headers=headers)
+    response = requests.post(url, json={"query": metadata_query}, headers=headers)
     if response.status_code != 200:
         raise RuntimeError(
             f"GraphQL query failed: {response.status_code} {response.text}"
@@ -178,7 +114,6 @@ def fetch_project_items(owner_type, owner, number, token):
     if "errors" in data:
         raise RuntimeError(f"GraphQL errors: {data['errors']}")
 
-    # Navigate the response structure dynamically based on owner_type
     root = (
         data["data"]["user"]
         if owner_type == "user"
@@ -187,7 +122,120 @@ def fetch_project_items(owner_type, owner, number, token):
     if not root or not root["projectV2"]:
         raise RuntimeError(f"Project not found: {owner}/{number}")
 
-    return root["projectV2"]
+    project_data = root["projectV2"]
+
+    # Now fetch all items with pagination
+    all_items = []
+    cursor = None
+    page_size = 100
+
+    while True:
+        after_clause = f', after: "{cursor}"' if cursor else ""
+        items_query = f"""
+        query {{
+          {owner_query_part} {{
+            projectV2(number: {number}) {{
+              items(first: {page_size}{after_clause}) {{
+                pageInfo {{
+                  hasNextPage
+                  endCursor
+                }}
+                nodes {{
+                  id
+                  type
+                  content {{
+                    ... on Issue {{
+                      title
+                      body
+                      state
+                      number
+                      url
+                      assignees(first: 10) {{
+                        nodes {{
+                          login
+                        }}
+                      }}
+                      labels(first: 10) {{
+                        nodes {{
+                          name
+                        }}
+                      }}
+                    }}
+                    ... on DraftIssue {{
+                      title
+                      body
+                    }}
+                  }}
+                  fieldValues(first: 20) {{
+                    nodes {{
+                      ... on ProjectV2ItemFieldSingleSelectValue {{
+                        name
+                        field {{
+                          ... on ProjectV2FieldCommon {{
+                            name
+                          }}
+                        }}
+                      }}
+                      ... on ProjectV2ItemFieldTextValue {{
+                        text
+                        field {{
+                          ... on ProjectV2FieldCommon {{
+                            name
+                          }}
+                        }}
+                      }}
+                      ... on ProjectV2ItemFieldDateValue {{
+                        date
+                        field {{
+                          ... on ProjectV2FieldCommon {{
+                            name
+                          }}
+                        }}
+                      }}
+                      ... on ProjectV2ItemFieldIterationValue {{
+                        title
+                        field {{
+                          ... on ProjectV2FieldCommon {{
+                            name
+                          }}
+                        }}
+                      }}
+                    }}
+                  }}
+                }}
+              }}
+            }}
+          }}
+        }}
+        """
+
+        response = requests.post(url, json={"query": items_query}, headers=headers)
+        if response.status_code != 200:
+            raise RuntimeError(
+                f"GraphQL query failed: {response.status_code} {response.text}"
+            )
+
+        data = response.json()
+        if "errors" in data:
+            raise RuntimeError(f"GraphQL errors: {data['errors']}")
+
+        root = (
+            data["data"]["user"]
+            if owner_type == "user"
+            else data["data"]["organization"]
+        )
+
+        items_data = root["projectV2"]["items"]
+        all_items.extend(items_data["nodes"])
+
+        page_info = items_data["pageInfo"]
+        if not page_info["hasNextPage"]:
+            break
+        cursor = page_info["endCursor"]
+
+    # Combine metadata with all items
+    project_data["items"] = {"nodes": all_items}
+    return project_data
 
 
 # =============================================================================

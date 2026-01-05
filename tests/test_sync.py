@@ -957,3 +957,115 @@ def test_local_variables_block_disabled():
     assert "* COMMENT Local Variables" not in output
     assert "# Local Variables:" not in output
     assert "# eval: (project-to-org-mode 1)" not in output
+
+
+def test_pagination_fetches_all_items():
+    """Test that pagination fetches all items across multiple pages."""
+    from unittest.mock import patch, MagicMock
+    
+    # Mock responses for metadata query and two pages of items
+    metadata_response = {
+        "data": {
+            "user": {
+                "projectV2": {
+                    "title": "Paginated Project",
+                    "fields": {"nodes": []}
+                }
+            }
+        }
+    }
+    
+    page1_response = {
+        "data": {
+            "user": {
+                "projectV2": {
+                    "items": {
+                        "pageInfo": {
+                            "hasNextPage": True,
+                            "endCursor": "cursor123"
+                        },
+                        "nodes": [
+                            {"id": "item1", "type": "ISSUE", "content": {"title": "Issue 1"}, "fieldValues": {"nodes": []}},
+                            {"id": "item2", "type": "ISSUE", "content": {"title": "Issue 2"}, "fieldValues": {"nodes": []}}
+                        ]
+                    }
+                }
+            }
+        }
+    }
+    
+    page2_response = {
+        "data": {
+            "user": {
+                "projectV2": {
+                    "items": {
+                        "pageInfo": {
+                            "hasNextPage": False,
+                            "endCursor": "cursor456"
+                        },
+                        "nodes": [
+                            {"id": "item3", "type": "ISSUE", "content": {"title": "Issue 3"}, "fieldValues": {"nodes": []}}
+                        ]
+                    }
+                }
+            }
+        }
+    }
+    
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    # Return metadata first, then page 1, then page 2
+    mock_response.json.side_effect = [metadata_response, page1_response, page2_response]
+    
+    with patch('requests.post', return_value=mock_response):
+        result = fetch_project_items("user", "testuser", 1, "fake-token")
+    
+    assert result["title"] == "Paginated Project"
+    assert len(result["items"]["nodes"]) == 3
+    assert result["items"]["nodes"][0]["id"] == "item1"
+    assert result["items"]["nodes"][1]["id"] == "item2"
+    assert result["items"]["nodes"][2]["id"] == "item3"
+
+
+def test_pagination_single_page():
+    """Test that single-page projects work correctly."""
+    from unittest.mock import patch, MagicMock
+    
+    metadata_response = {
+        "data": {
+            "user": {
+                "projectV2": {
+                    "title": "Small Project",
+                    "fields": {"nodes": []}
+                }
+            }
+        }
+    }
+    
+    single_page_response = {
+        "data": {
+            "user": {
+                "projectV2": {
+                    "items": {
+                        "pageInfo": {
+                            "hasNextPage": False,
+                            "endCursor": None
+                        },
+                        "nodes": [
+                            {"id": "item1", "type": "ISSUE", "content": {"title": "Only Issue"}, "fieldValues": {"nodes": []}}
+                        ]
+                    }
+                }
+            }
+        }
+    }
+    
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.side_effect = [metadata_response, single_page_response]
+    
+    with patch('requests.post', return_value=mock_response):
+        result = fetch_project_items("user", "testuser", 1, "fake-token")
+    
+    assert result["title"] == "Small Project"
+    assert len(result["items"]["nodes"]) == 1

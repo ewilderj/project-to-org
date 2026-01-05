@@ -149,7 +149,6 @@ The same mappings can be set via CLI options (`--status-map`, `--priority-map`, 
 
 - **One-way sync only**: GitHub → Org. Local changes will be lost on re-sync.
 - **No write-back**: Editing TODO states in Org does not update GitHub.
-- **100 item limit**: Currently fetches the first 100 items from a project (pagination not yet implemented).
 
 ## License
 
