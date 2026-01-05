@@ -655,6 +655,11 @@ class OrgConverter:
         # Normalize line endings
         text = text.replace('\r\n', '\n').replace('\r', '\n')
 
+        # Convert markdown lists to org lists (must be before bold/italic)
+        # Handles: * item, + item (- item already works in org)
+        text = re.sub(r'^(\s*)\* ', r'\1- ', text, flags=re.MULTILINE)
+        text = re.sub(r'^(\s*)\+ ', r'\1- ', text, flags=re.MULTILINE)
+
         # Code blocks
         text = re.sub(
             r'```(\w*)\n(.*?)```',
