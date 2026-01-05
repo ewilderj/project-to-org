@@ -41,13 +41,7 @@ git clone https://github.com/ewilderj/project-to-org.git
 cd project-to-org
 ```
 
-### Step 2: Install Python Dependencies
-
-```bash
-uv sync
-```
-
-### Step 3: Set Up Emacs (Optional)
+### Step 2: Set Up Emacs (Optional)
 
 Choose one of these methods:
 
@@ -113,7 +107,7 @@ The file will be populated with your project's issues. The minor mode (`project-
 ### Alternative: Sync from Command Line
 
 ```bash
-uv run src/project_to_org/main.py \
+uv run project_to_org.py \
   --project-url https://github.com/users/YOUR_USERNAME/projects/1 \
   --org-file my-project.org
 ```
@@ -127,10 +121,15 @@ All settings are in the `project-to-org` customization group (`M-x customize-gro
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `project-to-org-python-command` | `"uv run"` | Command to run Python scripts |
+| `project-to-org-script-path` | `"project_to_org.py"` | Script path (relative or absolute) |
 | `project-to-org-compact-urls` | `t` | Show URLs as `owner/repo#123` |
 | `project-to-org-inline-metadata` | `t` | Show badges on headings |
 | `project-to-org-fold-properties` | `t` | Auto-fold properties drawers |
 | `project-to-org-issue-prefix` | `"#"` | Prefix for issue badges |
+| `project-to-org-assignee-prefix` | `"👤 "` | Prefix for assignee badges |
+| `project-to-org-label-prefix` | `"🏷️ "` | Prefix for label badges |
+
+If `project-to-org-script-path` is a relative path (the default), it searches standard locations (package directory, straight.el repos, quelpa packages). If set to an absolute path, it uses that directly. Prefix for issue badges |
 | `project-to-org-assignee-prefix` | `"👤 "` | Prefix for assignee badges |
 | `project-to-org-label-prefix` | `"🏷️ "` | Prefix for label badges |
 
@@ -152,7 +151,7 @@ By default, statuses map to: `Todo` → `TODO`, `In Progress` → `STRT`, `Done`
 To customize:
 
 ```bash
-uv run src/project_to_org/main.py \
+uv run project_to_org.py \
   --project-url ... \
   --status-map 'Backlog=WAIT Todo=TODO "In Progress"=STRT Done=DONE'
 ```
@@ -173,18 +172,19 @@ GitHub Project priorities are mapped to Org priority cookies (`[#A]`, `[#B]`, et
 For custom priority fields, use `--priority-map`:
 
 ```bash
-uv run src/project_to_org/main.py \
+uv run project_to_org.py \
   --project-url ... \
   --priority-map 'Critical=A Important=B Normal=C'
 ```
 
 ## How It Works
 
-1. The Python script queries GitHub's GraphQL API via the `gh` CLI
-2. Issues and draft issues are converted to Org headings with properties
-3. Status colors are stored in `#+GITHUB_STATUS_COLORS` for the Emacs mode
-4. The Emacs mode applies overlays for colors, compact URLs, and badges
-5. Overlays refresh automatically when the file is saved
+1. The standalone Python script (`project_to_org.py`) has inline dependencies and runs via `uv run`
+2. It queries GitHub's GraphQL API via the `gh` CLI for authentication
+3. Issues and draft issues are converted to Org headings with properties
+4. Status colors are stored in `#+GITHUB_STATUS_COLORS` for the Emacs mode
+5. The Emacs mode applies overlays for colors, compact URLs, and badges
+6. Overlays refresh automatically when the file is saved
 
 ## Limitations
 

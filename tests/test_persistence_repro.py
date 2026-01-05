@@ -1,7 +1,7 @@
 import os
 import tempfile
 from unittest.mock import patch
-from project_to_org.main import main
+from project_to_org import main
 import pytest
 
 # Mock data
@@ -27,9 +27,9 @@ def test_persistence_repro():
 
     try:
         # 1. First Sync
-        with patch('project_to_org.main.fetch_project_items', return_value=MOCK_PROJECT_DATA), \
-             patch('project_to_org.main.get_github_token', return_value="fake_token"), \
-             patch('project_to_org.main.parse_project_url', return_value=("user", "owner", 1)), \
+        with patch('project_to_org.fetch_project_items', return_value=MOCK_PROJECT_DATA), \
+             patch('project_to_org.get_github_token', return_value="fake_token"), \
+             patch('project_to_org.parse_project_url', return_value=("user", "owner", 1)), \
              patch('sys.argv', ["main.py", "--project-url", "https://github.com/users/owner/projects/1", "--org-file", org_file_path]):
             
             main()
@@ -47,9 +47,9 @@ def test_persistence_repro():
             f.write(content)
             
         # 3. Second Sync
-        with patch('project_to_org.main.fetch_project_items', return_value=MOCK_PROJECT_DATA), \
-             patch('project_to_org.main.get_github_token', return_value="fake_token"), \
-             patch('project_to_org.main.parse_project_url', return_value=("user", "owner", 1)), \
+        with patch('project_to_org.fetch_project_items', return_value=MOCK_PROJECT_DATA), \
+             patch('project_to_org.get_github_token', return_value="fake_token"), \
+             patch('project_to_org.parse_project_url', return_value=("user", "owner", 1)), \
              patch('sys.argv', ["main.py", "--project-url", "https://github.com/users/owner/projects/1", "--org-file", org_file_path]):
             
             main()

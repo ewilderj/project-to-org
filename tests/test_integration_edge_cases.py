@@ -1,8 +1,7 @@
 import pytest
 import time
 import json
-from project_to_org.github_client import fetch_project_items, get_github_token
-from project_to_org.org_converter import OrgConverter
+from project_to_org import fetch_project_items, get_github_token, OrgConverter
 # conftest is automatically loaded by pytest, but we need to import helpers if we want to use them directly
 # However, best practice is to put helpers in a separate module or use fixtures.
 # For now, let's just duplicate the imports or fix the path.

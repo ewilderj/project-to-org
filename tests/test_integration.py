@@ -1,7 +1,6 @@
 import pytest
 import time
-from project_to_org.github_client import fetch_project_items, get_github_token
-from project_to_org.org_converter import OrgConverter
+from project_to_org import fetch_project_items, get_github_token, OrgConverter
 from tests.conftest import run_gh, run_gh_text, OWNER, REPO
 
 @pytest.fixture(scope="module")

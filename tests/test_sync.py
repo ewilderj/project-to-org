@@ -1,8 +1,7 @@
 import os
 import pytest
 import requests
-from project_to_org.github_client import get_github_token, parse_project_url, fetch_project_items
-from project_to_org.org_converter import OrgConverter
+from project_to_org import get_github_token, parse_project_url, fetch_project_items, OrgConverter, extract_config_from_org
 
 # Constants for the test project
 TEST_PROJECT_URL = "https://github.com/users/ewilderj/projects/2"
@@ -560,7 +559,6 @@ def test_priority_in_heading():
 
 def test_priority_persistence():
     """Test that priority map is persisted and read from file."""
-    from project_to_org.org_converter import extract_config_from_org
     import tempfile
     
     org_content = """#+TITLE: Test
@@ -650,7 +648,6 @@ def test_status_colors_extraction():
 
 def test_status_colors_persistence():
     """Test that status colors are read from file."""
-    from project_to_org.org_converter import extract_config_from_org
     import tempfile
     
     org_content = """#+TITLE: Test

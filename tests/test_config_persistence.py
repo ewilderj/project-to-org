@@ -1,6 +1,6 @@
 import os
 import tempfile
-from project_to_org.org_converter import extract_config_from_org
+from project_to_org import extract_config_from_org
 
 def test_extract_config_from_org():
     content = """

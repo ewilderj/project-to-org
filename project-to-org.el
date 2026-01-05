@@ -28,13 +28,58 @@ Defaults to \='uv run\=' which handles dependencies automatically."
   :type 'string
   :group 'project-to-org)
 
-(defcustom project-to-org-script-path
-  (expand-file-name "src/project_to_org/main.py"
-                    (file-name-directory
-                     (or load-file-name buffer-file-name)))
-  "Path to the Python script."
+(defcustom project-to-org-script-path "project_to_org.py"
+  "Path to the Python script.
+If a relative path (like the default), searches for it in:
+1. Same directory as this elisp file
+2. Resolved symlink location (for straight.el)
+3. straight.el repos directory
+4. quelpa packages directory
+
+If an absolute path, uses it directly."
   :type 'file
   :group 'project-to-org)
+
+(defun project-to-org--find-script (script-name)
+  "Find SCRIPT-NAME in standard locations.
+Returns the first existing path, or nil if not found."
+  (let* ((elisp-file (or load-file-name buffer-file-name))
+         (elisp-dir (and elisp-file (file-name-directory elisp-file)))
+         (true-elisp-file (and elisp-file (file-truename elisp-file)))
+         (true-elisp-dir
+          (and true-elisp-file (file-name-directory true-elisp-file)))
+         (candidates
+          (delq
+           nil
+           (list
+            ;; Same dir as elisp (manual install, :vc)
+            (and elisp-dir (expand-file-name script-name elisp-dir))
+            ;; True location after resolving symlinks
+            (and true-elisp-dir
+                 (expand-file-name script-name true-elisp-dir))
+            ;; straight.el repos
+            (expand-file-name (concat
+                               "straight/repos/project-to-org/"
+                               script-name)
+                              user-emacs-directory)
+            ;; quelpa packages
+            (expand-file-name (concat
+                               "quelpa/packages/project-to-org/"
+                               script-name)
+                              user-emacs-directory)))))
+    (seq-find #'file-exists-p candidates)))
+
+(defun project-to-org--resolve-script-path ()
+  "Resolve `project-to-org-script-path' to an absolute path.
+If the path is relative, searches standard locations.
+If absolute, returns it directly."
+  (if (file-name-absolute-p project-to-org-script-path)
+      project-to-org-script-path
+    (or
+     (project-to-org--find-script project-to-org-script-path)
+     (error
+      "Cannot find %s. Set `project-to-org-script-path' to absolute path"
+      project-to-org-script-path))))
 
 (defcustom project-to-org-compact-urls t
   "Whether to display GitHub URLs compactly (e.g., owner/repo#123)."
@@ -450,9 +495,7 @@ Requires #+GITHUB_PROJECT_URL to be set in the file."
   (let* ((project-url
           (project-to-org--get-property "GITHUB_PROJECT_URL"))
          (target-file (buffer-file-name))
-         (target-buffer (current-buffer))
-         (project-root
-          (file-name-directory (or load-file-name buffer-file-name))))
+         (target-buffer (current-buffer)))
     (unless project-url
       (user-error
        "No #+GITHUB_PROJECT_URL property found in this file"))
@@ -462,18 +505,18 @@ Requires #+GITHUB_PROJECT_URL to be set in the file."
 
     (message "Syncing with GitHub Project...")
 
-    (let ((output-buffer
-           (generate-new-buffer "*project-to-org-output*"))
-          (error-buffer
-           (generate-new-buffer "*project-to-org-error*"))
-          (default-directory project-root)
-          (args
-           (list
-            project-to-org-script-path
-            "--project-url"
-            project-url
-            "--org-file"
-            target-file)))
+    (let* ((output-buffer
+            (generate-new-buffer "*project-to-org-output*"))
+           (error-buffer
+            (generate-new-buffer "*project-to-org-error*"))
+           (script-path (project-to-org--resolve-script-path))
+           (args
+            (list
+             script-path
+             "--project-url"
+             project-url
+             "--org-file"
+             target-file)))
 
       (set-process-sentinel
        (make-process

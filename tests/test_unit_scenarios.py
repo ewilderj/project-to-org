@@ -1,5 +1,5 @@
 import pytest
-from project_to_org.org_converter import OrgConverter
+from project_to_org import OrgConverter
 
 def test_convert_complex_content():
     """Test converting complex markdown content."""
@@ -39,7 +39,7 @@ print("Hello")
     
     assert "* TODO Complex Content" in output
     assert "print(\"Hello\")" in output
-    assert "> Blockquote" in output
+    assert ": Blockquote" in output  # Blockquotes converted to Org fixed-width
     assert "# Heading 1" in output
 
 def test_convert_draft_issue():

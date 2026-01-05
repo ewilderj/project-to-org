@@ -1,14 +1,205 @@
+#!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#     "requests>=2.31.0",
+# ]
+# ///
+"""
+Sync GitHub Projects to Org-mode.
+
+Usage:
+    uv run project-to-org.py --project-url https://github.com/users/USERNAME/projects/1 --org-file output.org
+"""
+
+import argparse
 import datetime
-import shlex
-import re
 import os
+import re
+import shlex
+import subprocess
+import sys
+
+import requests
+
+
+# =============================================================================
+# GitHub Client
+# =============================================================================
+
+def get_github_token():
+    """Retrieve GitHub token from environment or gh CLI."""
+    token = os.getenv("GITHUB_TOKEN")
+    if token:
+        return token
+
+    try:
+        result = subprocess.run(
+            ["gh", "auth", "token"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        return result.stdout.strip()
+    except subprocess.CalledProcessError:
+        raise RuntimeError(
+            "Could not retrieve GitHub token. "
+            "Please set GITHUB_TOKEN or login with `gh auth login`."
+        )
+    except FileNotFoundError:
+        raise RuntimeError(
+            "`gh` CLI not found. Please install it or set GITHUB_TOKEN."
+        )
+
+
+def parse_project_url(url):
+    """Parse GitHub Project URL to get owner type, owner name, and project number."""
+    # Matches https://github.com/users/USERNAME/projects/NUMBER
+    user_match = re.match(r"https://github\.com/users/([^/]+)/projects/(\d+)", url)
+    if user_match:
+        return "user", user_match.group(1), int(user_match.group(2))
+
+    # Matches https://github.com/orgs/ORGNAME/projects/NUMBER
+    org_match = re.match(r"https://github\.com/orgs/([^/]+)/projects/(\d+)", url)
+    if org_match:
+        return "organization", org_match.group(1), int(org_match.group(2))
+
+    raise ValueError(f"Invalid GitHub Project URL: {url}")
+
+
+def fetch_project_items(owner_type, owner, number, token):
+    """Fetch items from a GitHub Project V2."""
+    url = "https://api.github.com/graphql"
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Construct the query based on owner type
+    if owner_type == "user":
+        owner_query_part = f'user(login: "{owner}")'
+    else:
+        owner_query_part = f'organization(login: "{owner}")'
+
+    query = f"""
+    query {{
+      {owner_query_part} {{
+        projectV2(number: {number}) {{
+          title
+          fields(first: 20) {{
+            nodes {{
+              ... on ProjectV2FieldCommon {{
+                name
+                dataType
+              }}
+              ... on ProjectV2SingleSelectField {{
+                name
+                options {{
+                  name
+                  color
+                }}
+              }}
+            }}
+          }}
+          items(first: 100) {{
+            nodes {{
+              id
+              type
+              content {{
+                ... on Issue {{
+                  title
+                  body
+                  state
+                  number
+                  url
+                  assignees(first: 10) {{
+                    nodes {{
+                      login
+                    }}
+                  }}
+                  labels(first: 10) {{
+                    nodes {{
+                      name
+                    }}
+                  }}
+                }}
+                ... on DraftIssue {{
+                  title
+                  body
+                }}
+              }}
+              fieldValues(first: 20) {{
+                nodes {{
+                  ... on ProjectV2ItemFieldSingleSelectValue {{
+                    name
+                    field {{
+                      ... on ProjectV2FieldCommon {{
+                        name
+                      }}
+                    }}
+                  }}
+                  ... on ProjectV2ItemFieldTextValue {{
+                    text
+                    field {{
+                      ... on ProjectV2FieldCommon {{
+                        name
+                      }}
+                    }}
+                  }}
+                  ... on ProjectV2ItemFieldDateValue {{
+                    date
+                    field {{
+                      ... on ProjectV2FieldCommon {{
+                        name
+                      }}
+                    }}
+                  }}
+                  ... on ProjectV2ItemFieldIterationValue {{
+                    title
+                    field {{
+                      ... on ProjectV2FieldCommon {{
+                        name
+                      }}
+                    }}
+                  }}
+                }}
+              }}
+            }}
+          }}
+        }}
+      }}
+    }}
+    """
+
+    response = requests.post(url, json={"query": query}, headers=headers)
+    if response.status_code != 200:
+        raise RuntimeError(
+            f"GraphQL query failed: {response.status_code} {response.text}"
+        )
+
+    data = response.json()
+    if "errors" in data:
+        raise RuntimeError(f"GraphQL errors: {data['errors']}")
+
+    # Navigate the response structure dynamically based on owner_type
+    root = (
+        data["data"]["user"]
+        if owner_type == "user"
+        else data["data"]["organization"]
+    )
+    if not root or not root["projectV2"]:
+        raise RuntimeError(f"Project not found: {owner}/{number}")
+
+    return root["projectV2"]
+
+
+# =============================================================================
+# Org Converter
+# =============================================================================
 
 def extract_config_from_org(file_path):
     """Extract configuration from an existing Org file."""
     config = {}
     if not os.path.exists(file_path):
         return config
-        
+
     with open(file_path, 'r') as f:
         for line in f:
             if line.startswith("#+GITHUB_STATUS_MAP:"):
@@ -21,22 +212,32 @@ def extract_config_from_org(file_path):
                 config['status_colors'] = line.split(":", 1)[1].strip()
     return config
 
+
 class OrgConverter:
-    def __init__(self, project_data, project_url=None, exclude_statuses=None, status_map_str=None, priority_map_str=None, status_colors_str=None, add_local_variables=True):
+    def __init__(
+        self,
+        project_data,
+        project_url=None,
+        exclude_statuses=None,
+        status_map_str=None,
+        priority_map_str=None,
+        status_colors_str=None,
+        add_local_variables=True
+    ):
         self.project_data = project_data
         self.project_url = project_url
         self.exclude_statuses = exclude_statuses or []
         self.add_local_variables = add_local_variables
-        
+
         if status_map_str:
             self.status_map = self._parse_status_map(status_map_str)
             self.status_map_str = status_map_str
         else:
             self.status_map = self._generate_default_status_map()
             self.status_map_str = self._generate_status_map_str()
-            
+
         self._validate_status_map()
-        
+
         # Priority mapping
         if priority_map_str:
             self.priority_map = self._parse_priority_map(priority_map_str)
@@ -44,7 +245,9 @@ class OrgConverter:
             self.priority_scheme = self._detect_priority_scheme_from_map()
         else:
             self.priority_map, self.priority_scheme = self._generate_default_priority_map()
-            self.priority_map_str = self._generate_priority_map_str() if self.priority_map else None
+            self.priority_map_str = (
+                self._generate_priority_map_str() if self.priority_map else None
+            )
 
         # Status colors (GitHub status -> org keyword -> color)
         if status_colors_str:
@@ -52,12 +255,14 @@ class OrgConverter:
             self.status_colors_str = status_colors_str
         else:
             self.status_colors = self._extract_status_colors()
-            self.status_colors_str = self._generate_status_colors_str() if self.status_colors else None
+            self.status_colors_str = (
+                self._generate_status_colors_str() if self.status_colors else None
+            )
 
     def _generate_default_status_map(self):
         """Generate a default status map based on project fields."""
         mapping = {}
-        
+
         # Get status options from project fields
         status_options = []
         fields = self.project_data.get("fields", {}).get("nodes", [])
@@ -66,10 +271,10 @@ class OrgConverter:
                 options = field.get("options", [])
                 status_options = [opt["name"] for opt in options]
                 break
-        
-        # If no status field found, fallback to hardcoded defaults or empty
+
+        # If no status field found, fallback to hardcoded defaults
         if not status_options:
-             return {
+            return {
                 "Todo": "TODO",
                 "In Progress": "STRT",
                 "Done": "DONE",
@@ -78,12 +283,12 @@ class OrgConverter:
 
         # Heuristics for mapping
         used_keywords = set()
-        
+
         for status in status_options:
             lower_status = status.lower()
             keyword = None
-            
-            # 1. Common mappings
+
+            # Common mappings
             if lower_status in ["todo", "to do", "open"]:
                 keyword = "TODO"
             elif lower_status in ["in progress", "doing", "active"]:
@@ -92,38 +297,35 @@ class OrgConverter:
                 keyword = "DONE"
             elif lower_status in ["someday", "backlog", "icebox", "blocked", "waiting"]:
                 keyword = "WAIT"
-            
-            # 2. Fallback: Generate from name
+
+            # Fallback: Generate from name
             if not keyword or keyword in used_keywords:
-                # Generate a keyword: UPPERCASE, replace spaces with _, max 4 chars if possible?
-                # Actually Org keywords can be longer. Let's just use UPPERCASE_UNDERSCORE.
                 candidate = status.upper().replace(" ", "_")
-                
-                # Ensure uniqueness
                 base_candidate = candidate
                 counter = 1
                 while candidate in used_keywords:
                     candidate = f"{base_candidate}_{counter}"
                     counter += 1
                 keyword = candidate
-            
+
             mapping[status] = keyword
             used_keywords.add(keyword)
-            
+
         return mapping
 
     def _validate_status_map(self):
         """Ensure that the status mapping is 1:1 (injective)."""
         values = list(self.status_map.values())
         if len(values) != len(set(values)):
-            # Find duplicates for better error message
             seen = set()
             duplicates = set()
             for x in values:
                 if x in seen:
                     duplicates.add(x)
                 seen.add(x)
-            raise ValueError(f"Status mapping must be 1:1. Duplicate Org keywords found: {duplicates}")
+            raise ValueError(
+                f"Status mapping must be 1:1. Duplicate Org keywords found: {duplicates}"
+            )
 
     def _parse_status_map(self, map_str):
         mapping = {}
@@ -134,8 +336,6 @@ class OrgConverter:
                     key, value = part.rsplit('=', 1)
                     mapping[key] = value
         except Exception:
-            # Fallback or log error? For now, return empty or default?
-            # Let's just return what we parsed so far or empty
             pass
         return mapping
 
@@ -159,18 +359,17 @@ class OrgConverter:
     def _detect_priority_scheme(self, options):
         """Detect if priority options are text-based or P-numbered."""
         option_names = [opt["name"].lower() for opt in options]
-        
+
         # Check for P-numbered scheme (P0, P1, P2, etc.)
         p_pattern = re.compile(r'^p\d+$')
         if all(p_pattern.match(name) for name in option_names):
             return "p-numbered"
-        
+
         # Check for text-based scheme (low, medium, high, etc.)
         text_keywords = {"low", "medium", "high", "critical", "urgent", "normal"}
         if any(name in text_keywords for name in option_names):
             return "text-based"
-        
-        # Unknown scheme - will need explicit mapping
+
         return "custom"
 
     def _generate_default_priority_map(self):
@@ -178,26 +377,23 @@ class OrgConverter:
         options = self._get_priority_field_options()
         if not options:
             return {}, None
-        
+
         scheme = self._detect_priority_scheme(options)
         mapping = {}
-        
+
         if scheme == "p-numbered":
-            # P0=A, P1=B, P2=C, P3=D, etc.
             for opt in options:
                 name = opt["name"]
                 match = re.match(r'^[Pp](\d+)$', name)
                 if match:
                     num = int(match.group(1))
-                    # A=0, B=1, C=2, D=3, etc.
-                    if num <= 25:  # A-Z
+                    if num <= 25:
                         mapping[name] = chr(ord('A') + num)
-                        
+
         elif scheme == "text-based":
-            # Map common text priorities
             text_mappings = {
                 "low": "C",
-                "medium": "B", 
+                "medium": "B",
                 "high": "A",
                 "critical": "A",
                 "urgent": "A",
@@ -208,13 +404,12 @@ class OrgConverter:
                 lower_name = name.lower()
                 if lower_name in text_mappings:
                     mapping[name] = text_mappings[lower_name]
-                    
+
         else:
-            # Custom scheme - generate sequential letters
             for i, opt in enumerate(options):
-                if i <= 25:  # A-Z
+                if i <= 25:
                     mapping[opt["name"]] = chr(ord('A') + i)
-        
+
         return mapping, scheme
 
     def _detect_priority_scheme_from_map(self):
@@ -259,24 +454,20 @@ class OrgConverter:
         """Generate #+PRIORITIES header based on scheme."""
         if not self.priority_map:
             return None
-        
+
         values = list(self.priority_map.values())
         if not values:
             return None
-            
-        # Sort to find min and max
+
         sorted_values = sorted(values)
-        max_pri = sorted_values[0]   # A is highest (lowest letter)
-        min_pri = sorted_values[-1]  # C/D is lowest (highest letter)
-        
-        # Default priority
+        max_pri = sorted_values[0]
+        min_pri = sorted_values[-1]
+
         if self.priority_scheme == "p-numbered":
-            # Managers think everything is P0, so default to A
             default_pri = "A"
         else:
-            # For text-based, default to middle (B)
             default_pri = "B" if "B" in values else max_pri
-            
+
         return f"#+PRIORITIES: {max_pri} {min_pri} {default_pri}"
 
     def _extract_status_colors(self):
@@ -289,7 +480,6 @@ class OrgConverter:
                     github_status = opt.get("name")
                     github_color = opt.get("color")
                     if github_status and github_color:
-                        # Map to org keyword
                         org_keyword = self.status_map.get(github_status)
                         if org_keyword:
                             colors[org_keyword] = github_color
@@ -321,56 +511,49 @@ class OrgConverter:
     def convert(self):
         """Convert project data to Org-mode string."""
         lines = []
-        
+
         # File header
         lines.append(f"#+TITLE: {self.project_data.get('title', 'GitHub Project')}")
         if self.project_url:
             lines.append(f"#+GITHUB_PROJECT_URL: {self.project_url}")
-        
-        # Persist the exclude_statuses setting
+
         if self.exclude_statuses:
-            lines.append(f"#+GITHUB_EXCLUDE_STATUSES: {' '.join(self.exclude_statuses)}")
-            
-        # Persist the status map
+            lines.append(
+                f"#+GITHUB_EXCLUDE_STATUSES: {' '.join(self.exclude_statuses)}"
+            )
+
         lines.append(f"#+GITHUB_STATUS_MAP: {self.status_map_str}")
-        
-        # Persist the priority map if we have one
+
         if self.priority_map_str:
             lines.append(f"#+GITHUB_PRIORITY_MAP: {self.priority_map_str}")
-        
-        # Persist the status colors if we have them
+
         if self.status_colors_str:
             lines.append(f"#+GITHUB_STATUS_COLORS: {self.status_colors_str}")
-        
+
         lines.append(f"#+DATE: {datetime.date.today()}")
-        
-        # Generate #+PRIORITIES line if we have priority mapping
+
         priorities_header = self._get_priorities_header()
         if priorities_header:
             lines.append(priorities_header)
-        
+
         # Generate #+TODO line dynamically
         todo_keywords = []
         done_keywords = []
-        
+
         for status, keyword in self.status_map.items():
-            # Heuristic: If status looks like "Done", put it in done keywords
             if status.lower() in ["done", "closed", "complete", "completed"]:
                 done_keywords.append(keyword)
             else:
                 todo_keywords.append(keyword)
-        
-        # If no done keywords found, but we have keywords, assume the last one is done? 
-        # Or just put everything in TODO if we can't tell.
-        # Let's default to "DONE" if it exists in values, otherwise just list them.
-        
+
         if not done_keywords and "DONE" in self.status_map.values():
-             done_keywords.append("DONE")
-             if "DONE" in todo_keywords: todo_keywords.remove("DONE")
+            done_keywords.append("DONE")
+            if "DONE" in todo_keywords:
+                todo_keywords.remove("DONE")
 
         todo_str = " ".join(todo_keywords)
         done_str = " ".join(done_keywords)
-        
+
         if done_str:
             lines.append(f"#+TODO: {todo_str} | {done_str}")
         else:
@@ -378,19 +561,18 @@ class OrgConverter:
 
         lines.append("#+STARTUP: show2levels")
         lines.append("")
-        
+
         items = self.project_data.get("items", {}).get("nodes", [])
         for item in items:
             lines.extend(self._convert_item(item))
-        
-        # Add local variables block to auto-enable project-to-org-mode
+
         if self.add_local_variables:
             lines.append("")
             lines.append("* COMMENT Local Variables")
             lines.append("# Local Variables:")
             lines.append("# eval: (project-to-org-mode 1)")
             lines.append("# End:")
-            
+
         return "\n".join(lines)
 
     def _convert_item(self, item):
@@ -398,138 +580,131 @@ class OrgConverter:
         content = item.get("content", {})
         if not content:
             return []
-            
-        # Extract basic info
+
         title = content.get("title", "No Title")
         body = content.get("body", "")
         url = content.get("url", "")
         item_type = item.get("type")
-        
-        # Parse field values
-        fields = self._parse_field_values(item.get("fieldValues", {}).get("nodes", []))
-        
-        # Determine TODO keyword from Status field
-        # Use first keyword in status_map as default for items without status
+
+        fields = self._parse_field_values(
+            item.get("fieldValues", {}).get("nodes", [])
+        )
+
         status = fields.get("Status")
         if status and status in self.status_map:
             todo_keyword = self.status_map[status]
         else:
-            # Default to first keyword in the map (or "TODO" if map is empty)
-            todo_keyword = next(iter(self.status_map.values()), "TODO") if self.status_map else "TODO"
-        
-        # Filter out excluded statuses (accept either GitHub status name or Org keyword)
+            todo_keyword = (
+                next(iter(self.status_map.values()), "TODO")
+                if self.status_map
+                else "TODO"
+            )
+
         if status in self.exclude_statuses or todo_keyword in self.exclude_statuses:
             return []
-        
-        # Determine priority cookie if Priority field exists
+
         priority_cookie = ""
         priority_value = fields.get("Priority")
         if priority_value and self.priority_map:
             org_priority = self.priority_map.get(priority_value)
             if org_priority:
                 priority_cookie = f" [#{org_priority}]"
-        
-        # Build heading
+
         lines = []
         lines.append(f"* {todo_keyword}{priority_cookie} {title}")
-        
-        # Properties drawer
+
         lines.append(":PROPERTIES:")
         lines.append(f":ID: {item.get('id')}")
         if url:
             lines.append(f":URL: {url}")
         if item_type == "ISSUE":
             lines.append(f":ISSUE_NUMBER: {content.get('number')}")
-            
-        # Add all other fields to properties
+
         for name, value in fields.items():
-            if name != "Status" and name != "Title": # Title is already in heading
-                # Org properties keys should be uppercase and usually no spaces (though spaces are allowed in some contexts, better to sanitize)
+            if name != "Status" and name != "Title":
                 safe_key = name.upper().replace(" ", "_")
                 lines.append(f":{safe_key}: {value}")
-                
-        # Add assignees and labels if present
-        assignees = [node["login"] for node in content.get("assignees", {}).get("nodes", [])]
+
+        assignees = [
+            node["login"]
+            for node in content.get("assignees", {}).get("nodes", [])
+        ]
         if assignees:
             lines.append(f":ASSIGNEES: {', '.join(assignees)}")
-            
-        labels = [node["name"] for node in content.get("labels", {}).get("nodes", [])]
-        # We could also put labels in Org tags, but let's put them in properties for now as requested
+
+        labels = [
+            node["name"]
+            for node in content.get("labels", {}).get("nodes", [])
+        ]
         if labels:
             lines.append(f":LABELS: {', '.join(labels)}")
-            
+
         lines.append(":END:")
-        
-        # Body content
+
         if body:
             lines.append("")
             lines.append(self._process_body(body))
             lines.append("")
-            
+
         return lines
 
     def _process_body(self, body):
         """Convert GitHub Markdown body to Org-mode syntax."""
         text = body
-        
-        # 0. Normalize line endings (remove Windows CR characters)
+
+        # Normalize line endings
         text = text.replace('\r\n', '\n').replace('\r', '\n')
-        
-        # 1. Code blocks (do first to protect content inside)
-        # ```language\ncode\n``` → #+BEGIN_SRC language\ncode\n#+END_SRC
+
+        # Code blocks
         text = re.sub(
             r'```(\w*)\n(.*?)```',
             lambda m: f'#+BEGIN_SRC {m.group(1)}\n{m.group(2)}#+END_SRC',
             text,
             flags=re.DOTALL
         )
-        
-        # 2. Inline code: `code` → =code=
-        # Be careful not to match inside code blocks (already converted)
+
+        # Inline code
         text = re.sub(r'`([^`\n]+)`', r'=\1=', text)
-        
-        # 3. Images: ![alt](url) → [[url]]
+
+        # Images
         text = re.sub(r'!\[([^\]]*)\]\(([^)]+)\)', r'[[\2]]', text)
-        
-        # 4. Links: [text](url) → [[url][text]]
+
+        # Links
         text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'[[\2][\1]]', text)
-        
-        # 5. Bold: **text** or __text__ → *text*
-        # Use a placeholder to avoid italic regex matching these
+
+        # Bold (use placeholders)
         text = re.sub(r'\*\*([^*]+)\*\*', r'⟦BOLD⟧\1⟦/BOLD⟧', text)
         text = re.sub(r'__([^_]+)__', r'⟦BOLD⟧\1⟦/BOLD⟧', text)
-        
-        # 6. Italic: *text* or _text_ → /text/
-        # Must come after bold conversion
-        # Be careful with underscores in words (snake_case)
+
+        # Italic
         text = re.sub(r'(?<![*⟧])\*([^*]+)\*(?![*⟦])', r'/\1/', text)
         text = re.sub(r'(?<![a-zA-Z0-9])_([^_]+)_(?![a-zA-Z0-9])', r'/\1/', text)
-        
-        # 7. Replace bold placeholders with Org bold
+
+        # Replace bold placeholders
         text = text.replace('⟦BOLD⟧', '*').replace('⟦/BOLD⟧', '*')
-        
-        # 8. Strikethrough: ~~text~~ → +text+
+
+        # Strikethrough
         text = re.sub(r'~~([^~]+)~~', r'+\1+', text)
-        
-        # 9. Blockquotes: > text → : text (Org fixed-width/quote style)
+
+        # Blockquotes
         text = re.sub(r'^>\s*(.*)$', r': \1', text, flags=re.MULTILINE)
-        
-        # 10. Checkboxes: - [x] → - [X] (uppercase for Org)
+
+        # Checkboxes
         text = re.sub(r'^(\s*[-+*]\s+)\[x\]', r'\1[X]', text, flags=re.MULTILINE)
-        
-        # 11. Horizontal rules: --- or *** or ___ → -----
+
+        # Horizontal rules
         text = re.sub(r'^(---+|\*\*\*+|___+)\s*$', r'-----', text, flags=re.MULTILINE)
-        
-        # 12. GitHub @mentions: @username → [[https://github.com/username][@username]]
-        text = re.sub(r'(?<![a-zA-Z0-9])@([a-zA-Z0-9][-a-zA-Z0-9]*)', 
-                      r'[[https://github.com/\1][@\1]]', text)
-        
-        # 13. Headers: # H1, ## H2 → not converted (would conflict with org headings)
-        # Leave as-is or could prefix with "* " but that creates sub-headings
-        
-        # 14. Trim trailing whitespace from each line
+
+        # GitHub @mentions
+        text = re.sub(
+            r'(?<![a-zA-Z0-9])@([a-zA-Z0-9][-a-zA-Z0-9]*)',
+            r'[[https://github.com/\1][@\1]]',
+            text
+        )
+
+        # Trim trailing whitespace
         text = '\n'.join(line.rstrip() for line in text.split('\n'))
-        
+
         return text
 
     def _parse_field_values(self, nodes):
@@ -538,25 +713,112 @@ class OrgConverter:
         for node in nodes:
             if not node:
                 continue
-                
+
             field_info = node.get("field", {})
             field_name = field_info.get("name")
-            
+
             if not field_name:
                 continue
-                
-            # Extract value based on type (the structure varies)
+
             value = None
-            if "name" in node and "field" in node: # Single Select
+            if "name" in node and "field" in node:
                 value = node["name"]
-            elif "text" in node: # Text
+            elif "text" in node:
                 value = node["text"]
-            elif "date" in node: # Date
+            elif "date" in node:
                 value = node["date"]
-            elif "title" in node: # Iteration
+            elif "title" in node:
                 value = node["title"]
-                
+
             if value is not None:
                 fields[field_name] = value
-                
+
         return fields
+
+
+# =============================================================================
+# Main
+# =============================================================================
+
+def main():
+    parser = argparse.ArgumentParser(description="Sync GitHub Projects to Org-mode")
+    parser.add_argument(
+        "--org-file",
+        help="Path to the Org file to sync",
+        required=False
+    )
+    parser.add_argument(
+        "--project-url",
+        help="GitHub Project URL",
+        required=True
+    )
+    parser.add_argument(
+        "--exclude-statuses",
+        help="List of statuses to exclude",
+        nargs="*",
+        default=[]
+    )
+    parser.add_argument(
+        "--status-map",
+        help="Status mapping string (e.g. 'Todo=TODO \"In Progress\"=STRT')",
+        required=False
+    )
+    parser.add_argument(
+        "--priority-map",
+        help="Priority mapping string (e.g. 'Low=C Medium=B High=A')",
+        required=False
+    )
+    parser.add_argument(
+        "--no-local-variables",
+        help="Don't add Local Variables block to enable project-to-org-mode",
+        action="store_true",
+        default=False
+    )
+
+    args = parser.parse_args()
+
+    try:
+        token = get_github_token()
+        owner_type, owner, number = parse_project_url(args.project_url)
+
+        project_data = fetch_project_items(owner_type, owner, number, token)
+
+        # Extract existing config if file exists
+        existing_config = {}
+        if args.org_file:
+            existing_config = extract_config_from_org(args.org_file)
+
+        # Determine mappings: CLI > File > Default
+        status_map_to_use = args.status_map or existing_config.get('status_map')
+        priority_map_to_use = args.priority_map or existing_config.get('priority_map')
+        status_colors_to_use = existing_config.get('status_colors')
+
+        exclude_statuses_to_use = args.exclude_statuses
+        if not exclude_statuses_to_use and existing_config.get('exclude_statuses'):
+            exclude_statuses_to_use = existing_config.get('exclude_statuses')
+
+        converter = OrgConverter(
+            project_data,
+            project_url=args.project_url,
+            exclude_statuses=exclude_statuses_to_use,
+            status_map_str=status_map_to_use,
+            priority_map_str=priority_map_to_use,
+            status_colors_str=status_colors_to_use,
+            add_local_variables=not args.no_local_variables
+        )
+        org_content = converter.convert()
+
+        if args.org_file:
+            with open(args.org_file, "w") as f:
+                f.write(org_content)
+            print(f"Successfully synced to {args.org_file}")
+        else:
+            print(org_content)
+
+    except Exception as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
